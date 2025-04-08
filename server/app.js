@@ -25,7 +25,7 @@ const publicPdfRoutes = require('./routes/publicPdfRoutes');
 
 // Inicializar app
 const app = express();
-const PORT = 5009; // Forzar el puerto 5006
+const PORT = process.env.PORT || 5009; // Usar el puerto asignado por Render o 5009 por defecto
 
 // Middleware
 // Configuración de CORS - Permitir todas las solicitudes en cualquier entorno
@@ -69,6 +69,7 @@ if (process.env.NODE_ENV === 'development') {
   console.log('Modo desarrollo: Iniciando servidor sin esperar conexión a la base de datos...');
 
   // Iniciar el servidor inmediatamente en modo desarrollo
+  console.log(`Intentando iniciar servidor en puerto ${PORT} (process.env.PORT=${process.env.PORT})`);
   const server = app.listen(PORT, () => {
     console.log(`Servidor corriendo en puerto ${PORT} (modo desarrollo)`);
     console.log('NOTA: Las funcionalidades que requieren base de datos podrían no estar disponibles.');
@@ -149,6 +150,7 @@ if (process.env.NODE_ENV === 'development') {
       console.log('Conexión a la base de datos principal establecida');
 
       // Iniciar servidor solo si la conexión a la base de datos es exitosa
+      console.log(`Intentando iniciar servidor en puerto ${PORT} (process.env.PORT=${process.env.PORT})`);
       const server = app.listen(PORT, () => {
         console.log(`Servidor corriendo en puerto ${PORT} (modo producción)`);
       });
