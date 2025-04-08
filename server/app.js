@@ -22,6 +22,7 @@ const { connectMainDatabase } = require('./config/database');
 const { checkDatabaseConnection } = require('./middleware/databaseCheck');
 
 // Importar rutas
+const authRoutes = require('./routes/auth');
 const companyRoutes = require('./routes/companies');
 const employeeRoutes = require('./routes/employees');
 const questionRoutes = require('./routes/questions');
@@ -39,7 +40,8 @@ const PORT = process.env.PORT || 5000; // Usar el puerto 5000 por defecto
 const allowedOrigins = [
   'http://localhost:3000',
   'https://sermalite-feedback.netlify.app',
-  'https://sermalite-feedback-client.onrender.com'
+  'https://sermalite-feedback-client.onrender.com',
+  'https://leafy-taiyaki-4f87e4.netlify.app'
 ];
 
 const corsOptions = {
@@ -79,14 +81,20 @@ app.use(express.urlencoded({ extended: true }));
 // Servir archivos estáticos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Configurar rutas API con verificación de conexión a la base de datos
-app.use('/api/companies', checkDatabaseConnection, companyRoutes);
-app.use('/api/employees', checkDatabaseConnection, employeeRoutes);
-app.use('/api/questions', checkDatabaseConnection, questionRoutes);
-app.use('/api/feedback', checkDatabaseConnection, feedbackRoutes);
-app.use('/api/dashboard', checkDatabaseConnection, dashboardRoutes);
-app.use('/api/categories', checkDatabaseConnection, categoryRoutes);
-app.use('/api/pdf', checkDatabaseConnection, pdfRoutes);
+// Importar middleware de autenticación
+const { authenticateToken } = require('./middleware/auth');
+
+// Configurar rutas de autenticación (sin verificación de conexión a la base de datos)
+app.use('/api/auth', authRoutes);
+
+// Configurar rutas API con verificación de conexión a la base de datos y autenticación
+app.use('/api/companies', checkDatabaseConnection, authenticateToken, companyRoutes);
+app.use('/api/employees', checkDatabaseConnection, authenticateToken, employeeRoutes);
+app.use('/api/questions', checkDatabaseConnection, authenticateToken, questionRoutes);
+app.use('/api/feedback', checkDatabaseConnection, feedbackRoutes); // No requiere autenticación para permitir respuestas anónimas
+app.use('/api/dashboard', checkDatabaseConnection, authenticateToken, dashboardRoutes);
+app.use('/api/categories', checkDatabaseConnection, authenticateToken, categoryRoutes);
+app.use('/api/pdf', checkDatabaseConnection, authenticateToken, pdfRoutes);
 
 // Configurar conexión a MongoDB
 if (process.env.NODE_ENV === 'development') {

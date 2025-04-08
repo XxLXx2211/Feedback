@@ -7,10 +7,16 @@ const hostname = window.location.hostname;
 // Si estamos accediendo desde una IP, usar esa IP para la API
 // Si estamos en localhost, usar localhost
 // En producción, usar la URL de la API configurada en las variables de entorno
-const API_URL = process.env.REACT_APP_API_URL ||
+let API_URL = process.env.REACT_APP_API_URL ||
   (hostname === 'localhost' ? 'http://localhost:5000/api' :
    (hostname.includes('netlify.app') ? 'https://sermalite-feedback-api.onrender.com/api' :
     `http://${hostname}:5000/api`));
+
+// Forzar la URL de la API en producción para Netlify
+if (hostname.includes('leafy-taiyaki-4f87e4.netlify.app')) {
+  console.log('Detectado dominio de Netlify, forzando URL de API');
+  API_URL = 'https://sermalite-feedback-api.onrender.com/api';
+}
 
 // Asegurarnos de que estamos usando el puerto correcto (5000)
 
