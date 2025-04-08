@@ -1,32 +1,33 @@
 services:
   # Backend API Service
   - type: web
-    name: pdfeedback-api
+    name: sermalite-feedback-api
     env: node
     plan: free
     buildCommand: cd server && npm install
     startCommand: cd server && node app.js
+    healthCheckPath: /api/status
     envVars:
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
-        sync: false
+        value: mongodb+srv://Leo:21752009@servicio-sermalite.pvgfgh4.mongodb.net/?retryWrites=true&w=majority&appName=Servicio-Sermalite
       - key: PDF_MONGODB_URI
-        sync: false
+        value: mongodb+srv://xxleoxx2175:ipj3RG8FkPD8n6kq@pdfsfeedback.omghpst.mongodb.net/PDFs?retryWrites=true&w=majority
       - key: JWT_SECRET
-        sync: false
+        value: feedback_system_secret_key_production
       - key: GEMINI_API_KEY
-        sync: false
+        value: AIzaSyAEzl_JpUv0PrqwFQG1mxZyG7vjS2_Vv_E
       - key: LLMWHISPERER_API_KEY
-        sync: false
+        value: 4KjptuSzKr5nL_BYnA7eJO9IUmiTXCuVx37U1_QiMSo
       - key: LLMWHISPERER_BASE_URL_V2
-        sync: false
+        value: https://llmwhisperer-api.us-central.unstract.com/api/v2
       - key: PORT
         value: 10000
 
   # Frontend Static Site
   - type: web
-    name: pdfeedback-client
+    name: sermalite-feedback-client
     env: static
     plan: free
     buildCommand: cd client && npm install && npm run build
@@ -38,6 +39,6 @@ services:
     envVars:
       - key: REACT_APP_API_URL
         fromService:
-          name: pdfeedback-api
+          name: sermalite-feedback-api
           type: web
           property: url

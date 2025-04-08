@@ -1,7 +1,4 @@
-import axios from 'axios';
-
-// URL base de la API
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+import API from './api';
 
 /**
  * Subir un archivo PDF
@@ -18,11 +15,10 @@ export const uploadPDF = async (formData) => {
 
     while (retries > 0) {
       try {
-        const response = await axios.post(`${API_URL}/pdf/upload`, formData, {
+        const response = await API.post('/pdf/upload', formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           },
-          timeout: 60000, // 60 segundos de timeout para archivos grandes
           maxContentLength: 20 * 1024 * 1024, // 20MB máximo
           maxBodyLength: 20 * 1024 * 1024, // 20MB máximo
           maxRedirects: 5,
@@ -80,7 +76,6 @@ export const uploadPDF = async (formData) => {
 export const getDocuments = async () => {
   try {
     console.log('Solicitando lista de documentos...');
-    console.log('URL de la API:', API_URL);
 
     // Intentar con reintentos
     let retries = 3;
@@ -88,11 +83,9 @@ export const getDocuments = async () => {
 
     while (retries > 0) {
       try {
-        const url = `${API_URL}/pdf/documents`;
-        console.log('URL completa:', url);
+        console.log('Obteniendo documentos PDF...');
 
-        const response = await axios.get(url, {
-          timeout: 15000, // 15 segundos de timeout
+        const response = await API.get('/pdf/documents', {
           // Configuración adicional para mejorar la estabilidad
           maxRedirects: 5,
           validateStatus: status => status >= 200 && status < 500 // Considerar errores 4xx como respuestas válidas
@@ -152,7 +145,7 @@ export const getDocuments = async () => {
  */
 export const getDocument = async (id) => {
   try {
-    const response = await axios.get(`${API_URL}/pdf/documents/${id}`);
+    const response = await API.get(`/pdf/documents/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error al obtener documento ${id}:`, error.response ? error.response.data : error.message);
@@ -167,7 +160,7 @@ export const getDocument = async (id) => {
  */
 export const deleteDocument = async (id) => {
   try {
-    const response = await axios.delete(`${API_URL}/pdf/documents/${id}`);
+    const response = await API.delete(`/pdf/documents/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error al eliminar documento ${id}:`, error.response ? error.response.data : error.message);
@@ -183,7 +176,7 @@ export const deleteDocument = async (id) => {
 export const analyzePDF = async (id) => {
   try {
     console.log(`Analizando documento ${id}`);
-    const response = await axios.post(`${API_URL}/pdf/analyze/${id}`);
+    const response = await API.post(`/pdf/analyze/${id}`);
     console.log('Respuesta del servidor (análisis):', response);
     return response;
   } catch (error) {
@@ -210,7 +203,7 @@ export const chatWithPDF = async (id, message) => {
       payload = { message };
     }
 
-    const response = await axios.post(`${API_URL}/pdf/chat/${id}`, payload);
+    const response = await API.post(`/pdf/chat/${id}`, payload);
     console.log('Respuesta del servidor (chat):', response);
     return response;
   } catch (error) {

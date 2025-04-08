@@ -2,7 +2,7 @@ require('dotenv').config();
 const axios = require('axios');
 
 // URL base de la API
-const API_URL = 'http://localhost:5001/api';
+const API_URL = 'http://localhost:5009/api';
 
 // Función para verificar el endpoint de estado
 async function checkStatusEndpoint() {

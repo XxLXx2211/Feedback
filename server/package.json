@@ -10,7 +10,10 @@
     "migrate": "node scripts/migrateToOptimizedSchema.js",
     "migrate-pdf": "node scripts/migratePDFDocuments.js",
     "test-pdf": "node scripts/testLLMWhisperer.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test-db": "node scripts/testMongoDBConnection.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "render-build": "npm install",
+    "render-start": "node app.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.1.1",

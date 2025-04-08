@@ -12,6 +12,7 @@ exports.getQuestions = async (req, res) => {
     const transformedQuestions = questions.map(q => ({
       _id: q._id,
       texto: q.t,
+      texto_completo: q.t, // Añadir el texto completo de la pregunta
       tipo_respuesta: q.r === 'e' ? 'escala' : q.r === 's' ? 'si_no' : 'texto',
       importancia: q.i,
       categoria: q.c ? { _id: q.c._id, nombre: q.c.n } : null,
@@ -42,6 +43,7 @@ exports.getQuestion = async (req, res) => {
     const transformedQuestion = {
       _id: question._id,
       texto: question.t,
+      texto_completo: question.t, // Añadir el texto completo de la pregunta
       tipo_respuesta: question.r === 'e' ? 'escala' : question.r === 's' ? 'si_no' : 'texto',
       importancia: question.i,
       categoria: question.c ? { _id: question.c._id, nombre: question.c.n } : null,

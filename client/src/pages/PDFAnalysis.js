@@ -360,8 +360,10 @@ const PDFAnalysis = () => {
 
   // Manejar visualización de PDF
   const handleViewPDF = (id) => {
+    // Obtener la URL base de la API desde el archivo de configuración
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5009/api';
     // Abrir el PDF en una nueva pestaña
-    window.open(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/pdf/view/${id}`, '_blank');
+    window.open(`${API_URL}/pdf/view/${id}`, '_blank');
   };
 
   // Manejar descarga de PDF

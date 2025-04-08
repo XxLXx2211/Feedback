@@ -1,5 +1,22 @@
 const mongoose = require('mongoose');
 
+// Configurar DNS para resolver problemas con MongoDB Atlas
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first'); // Priorizar IPv4 sobre IPv6
+
+// Configurar variables de entorno para Node.js
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '1'; // Verificar certificados SSL
+process.env.UV_THREADPOOL_SIZE = '64'; // Aumentar el tamaño del pool de threads
+
+// Configurar mongoose para usar el nuevo parser de URL
+mongoose.set('strictQuery', false); // Preparación para Mongoose 7
+
+// Desactivar la validación estricta de esquemas
+mongoose.set('strict', false);
+
+// Permitir comandos en buffer mientras se establece la conexión
+mongoose.set('bufferCommands', true);
+
 // Variable para almacenar la conexión
 let pdfConnection = null;
 
@@ -19,27 +36,82 @@ const connectPDFDatabase = async () => {
       throw new Error('La variable de entorno PDF_MONGODB_URI no está definida. Esta variable es necesaria para conectarse a la base de datos de PDFs.');
     }
 
-    console.log(`Intentando conectar a la base de datos de PDFs: ${PDF_MONGODB_URI.replace(/:[^:]*@/, ':****@')}`);
+    console.log(`Intentando conectar a la base de datos de PDFs...`);
+    console.log(`URI: ${PDF_MONGODB_URI.replace(/:[^:]*@/, ':****@')}`);
+
+    // Intentar conectar directamente con Mongoose
+    console.log('Intentando conectar con Mongoose para PDFs...');
+
+    // Sistema de reintentos mejorado
+    let retries = 5; // Aumentado a 5 intentos
+    let lastError = null;
 
     // Opciones de conexión mejoradas
-    const connectionOptions = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 30000, // 30 segundos de timeout
-      socketTimeoutMS: 45000, // 45 segundos para operaciones
+    const mongooseOptions = {
+      serverSelectionTimeoutMS: 30000, // 30 segundos para la selección del servidor
+      socketTimeoutMS: 45000, // 45 segundos para operaciones de socket
       connectTimeoutMS: 30000, // 30 segundos para la conexión inicial
-      family: 4, // Forzar IPv4
+      keepAlive: true,
+      keepAliveInitialDelay: 300000, // 5 minutos
+      maxPoolSize: 10, // Máximo de 10 conexiones en el pool
+      minPoolSize: 1, // Mínimo de 1 conexión en el pool
       retryWrites: true,
-      w: 'majority',
-      maxPoolSize: 10,
-      minPoolSize: 1
+      w: 'majority'
     };
 
-    // Crear una conexión separada para la base de datos de PDFs
-    pdfConnection = await mongoose.createConnection(PDF_MONGODB_URI, connectionOptions);
+    while (retries > 0) {
+      try {
+        // Intentar la conexión con las opciones mejoradas
+        pdfConnection = await mongoose.createConnection(PDF_MONGODB_URI, mongooseOptions);
+        console.log('Conectado exitosamente a la base de datos de PDFs con Mongoose');
 
-    console.log('Conexión exitosa a la base de datos de PDFs');
-    return pdfConnection;
+        // Configurar eventos de conexión
+        pdfConnection.on('error', (err) => {
+          console.error('Error en la conexión a la base de datos de PDFs:', err);
+          // No cerramos la conexión aquí, dejamos que mongoose intente reconectar
+        });
+
+        pdfConnection.on('disconnected', () => {
+          console.log('Base de datos de PDFs desconectada. Intentando reconectar...');
+        });
+
+        pdfConnection.on('reconnected', () => {
+          console.log('Reconectado exitosamente a la base de datos de PDFs');
+        });
+
+        // Configurar manejo de reconexión automática
+        pdfConnection.on('close', () => {
+          console.log('Conexión a la base de datos de PDFs cerrada. Intentando reconectar...');
+          // Intentar reconectar automáticamente
+          setTimeout(async () => {
+            try {
+              if (!pdfConnection || pdfConnection.readyState !== 1) {
+                pdfConnection = await mongoose.createConnection(PDF_MONGODB_URI, mongooseOptions);
+                console.log('Reconectado exitosamente a la base de datos de PDFs');
+              }
+            } catch (reconnectError) {
+              console.error('Error al reconectar a la base de datos de PDFs:', reconnectError);
+            }
+          }, 5000);
+        });
+
+        return pdfConnection;
+      } catch (attemptError) {
+        lastError = attemptError;
+        retries--;
+
+        if (retries > 0) {
+          console.log(`Error al conectar a la base de datos de PDFs (intento ${3-retries}/3). Reintentando...`);
+          console.error('Detalles del error:', attemptError.message);
+
+          // Esperar 3 segundos antes de reintentar
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
+    }
+
+    // Si llegamos aquí, todos los intentos fallaron
+    throw lastError || new Error('No se pudo conectar a la base de datos de PDFs después de varios intentos');
   } catch (error) {
     console.error('Error al conectar a la base de datos de PDFs:', error);
     pdfConnection = null;

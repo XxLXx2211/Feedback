@@ -7,8 +7,8 @@ const answerSchema = new mongoose.Schema({
     required: true
   },
   sq: { // subpregunta abreviada
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Question.s'
+    type: String, // Cambiado a String para aceptar los índices de las subpreguntas
+    trim: true
   },
   e: { // valor_escala abreviado
     type: Number,

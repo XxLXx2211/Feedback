@@ -9,4 +9,5 @@
   status = 200
 
 [build.environment]
-  REACT_APP_API_URL = "https://pdfeedback-api.onrender.com"
+  REACT_APP_API_URL = "https://sermalite-feedback-api.onrender.com/api"
+  CI = "false"

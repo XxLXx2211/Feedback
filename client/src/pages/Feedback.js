@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Table, Badge, Spinner, Alert } from 'react-bootstrap';
 import { FaPlus, FaEdit, FaTrash, FaLink, FaEye, FaClipboardCheck } from 'react-icons/fa';
 import ThemeText from '../components/ThemeText';
+import DatabaseUnavailable from '../components/DatabaseUnavailable';
 import { getFeedbacks, deleteFeedback, createFeedbackLink } from '../services/feedbackService';
 import './Feedback.css';
 
@@ -26,8 +27,16 @@ const Feedback = () => {
       setFeedbacks(data);
       setError('');
     } catch (err) {
-      setError('Error al cargar los feedbacks. Por favor, intenta de nuevo.');
-      console.error('Error al cargar feedbacks:', err);
+      // Verificar si es un error de base de datos no disponible
+      if (err.response && err.response.status === 503 &&
+          (err.response.data.error === 'database_unavailable' ||
+           err.response.data.error === 'Base de datos no disponible')) {
+        // No establecer mensaje de error, se mostrará el componente DatabaseUnavailable
+        console.error('Error de base de datos no disponible:', err);
+      } else {
+        setError('Error al cargar los feedbacks. Por favor, intenta de nuevo.');
+        console.error('Error al cargar feedbacks:', err);
+      }
     } finally {
       setLoading(false);
     }
@@ -94,6 +103,18 @@ const Feedback = () => {
         <Spinner animation="border" variant="primary" />
       </Container>
     );
+  }
+
+  // Verificar si hay un error de base de datos no disponible
+  const isDatabaseUnavailable = (error) => {
+    return error && error.response && error.response.status === 503 &&
+      (error.response.data.error === 'database_unavailable' ||
+       error.response.data.error === 'Base de datos no disponible');
+  };
+
+  // Si hay un error de base de datos, mostrar el componente DatabaseUnavailable
+  if (!loading && isDatabaseUnavailable(error)) {
+    return <DatabaseUnavailable error={error} />;
   }
 
   return (

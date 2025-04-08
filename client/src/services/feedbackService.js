@@ -58,10 +58,25 @@ export const deleteFeedback = async (id) => {
 // Enviar respuestas a un feedback
 export const submitAnswers = async (id, answersData) => {
   try {
+    console.log('Enviando respuestas al servidor:', JSON.stringify(answersData, null, 2));
+
+    // Verificar si hay subpreguntas y mostrar información detallada
+    if (answersData.respuestas) {
+      const subpreguntas = answersData.respuestas.filter(r => r.subpregunta);
+      if (subpreguntas.length > 0) {
+        console.log(`Enviando ${subpreguntas.length} subpreguntas:`);
+        subpreguntas.forEach(sp => {
+          console.log(`- Pregunta: ${sp.pregunta}, Subpregunta: ${sp.subpregunta}, Texto: ${sp.subpregunta_texto || 'N/A'}, Valor: ${sp.valor_si_no}`);
+        });
+      }
+    }
+
     const response = await API.post(`/feedback/${id}/submit`, answersData);
+    console.log('Respuesta del servidor:', response.data);
     return response.data;
   } catch (error) {
     console.error(`Error al enviar respuestas al feedback ${id}:`, error);
+    console.error('Detalles del error:', error.response?.data || error.message);
     throw error;
   }
 };

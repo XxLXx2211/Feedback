@@ -1,12 +1,33 @@
+const mongoose = require('mongoose');
 const Employee = require('../models/Employee');
 const Feedback = require('../models/Feedback');
 
 // Obtener todos los empleados
 exports.getEmployees = async (req, res) => {
   try {
-    const employees = await Employee.find()
-      .populate('e', 'nombre')
+    console.log('Iniciando consulta de empleados...');
+
+    // Verificar la conexión a la base de datos
+    if (!mongoose.connection.readyState) {
+      console.error('Error: No hay conexión a la base de datos');
+      return res.status(500).json({
+        error: 'Error de conexión a la base de datos',
+        details: 'La conexión a la base de datos no está disponible'
+      });
+    }
+
+    // Intentar obtener los empleados con un timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Timeout al consultar empleados')), 10000);
+    });
+
+    const employeesPromise = Employee.find()
+      .populate('e', 'n') // Usar 'n' en lugar de 'nombre' para el campo abreviado
       .sort({ n: 1 });
+
+    const employees = await Promise.race([employeesPromise, timeoutPromise]);
+
+    console.log(`Se encontraron ${employees.length} empleados`);
 
     // Transformar los datos para mantener compatibilidad con el frontend
     const transformedEmployees = employees.map(emp => ({
@@ -14,7 +35,7 @@ exports.getEmployees = async (req, res) => {
       nombre_completo: emp.n,
       cedula: emp.c,
       puesto: emp.p,
-      empresa: emp.e ? { _id: emp.e._id, nombre: emp.e.nombre } : null,
+      empresa: emp.e ? { _id: emp.e._id, nombre: emp.e.n } : null, // Usar 'n' en lugar de 'nombre'
       activo: emp.a,
       createdAt: emp.creado,
       updatedAt: emp.actualizado
@@ -23,7 +44,11 @@ exports.getEmployees = async (req, res) => {
     res.status(200).json(transformedEmployees);
   } catch (error) {
     console.error('Error al obtener empleados:', error);
-    res.status(500).json({ error: 'Error al obtener empleados' });
+    res.status(500).json({
+      error: 'Error al obtener empleados',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 

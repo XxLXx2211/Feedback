@@ -135,7 +135,7 @@ async function checkAPI() {
   console.log('\n=== Verificando API ===');
   
   try {
-    const baseURL = 'http://localhost:5001/api';
+    const baseURL = 'http://localhost:5009/api';
     
     // Verificar endpoint de estado
     console.log('Verificando endpoint de estado...');

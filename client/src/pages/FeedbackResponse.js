@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { FaCheck, FaTimes, FaStar, FaRegStar, FaPaperPlane } from 'react-icons/fa';
 import { getFeedbackByToken, submitAnswers } from '../services/feedbackService';
 import './FeedbackResponse.css';
+import './VerticalResize.css';
 
 const FeedbackResponse = () => {
   const { token } = useParams();
@@ -21,6 +22,7 @@ const FeedbackResponse = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [progress, setProgress] = useState(0);
+
 
   // Cargar datos al montar el componente
   useEffect(() => {
@@ -155,6 +157,22 @@ const FeedbackResponse = () => {
 
   // Manejar cambio en respuestas de sí/no
   const handleYesNoChange = (questionId, value) => {
+    // Verificar si es una subpregunta (formato: preguntaId_subpreguntaId)
+    const isSubQuestion = questionId.includes('_');
+
+    if (isSubQuestion) {
+      const [mainQuestionId, subQuestionId] = questionId.split('_');
+      console.log(`Respondiendo subpregunta: ${questionId}, valor: ${value}`);
+
+      // Buscar la pregunta principal y la subpregunta para obtener el texto
+      const mainQuestion = questions.find(q => q._id === mainQuestionId);
+      const subQuestion = mainQuestion?.preguntas_si_no?.find(sq => sq._id === subQuestionId);
+
+      if (subQuestion) {
+        console.log(`Texto de la subpregunta: ${subQuestion.texto}`);
+      }
+    }
+
     setAnswers(prev => ({
       ...prev,
       [questionId]: {
@@ -217,15 +235,21 @@ const FeedbackResponse = () => {
       // Procesar subpreguntas
       for (const [key, answer] of Object.entries(answers)) {
         if (key.includes('_')) {
-          const [questionId] = key.split('_'); // Solo necesitamos el ID de la pregunta principal
+          const [questionId, subQuestionId] = key.split('_');
 
           // Solo agregar si tiene un valor definido
           if (answer.valor_si_no !== undefined) {
-            // Omitir el campo subpregunta para evitar errores de validación de ObjectId
+            // Buscar la pregunta principal para obtener el texto de la subpregunta
+            const mainQuestion = questions.find(q => q._id === questionId);
+            const subQuestion = mainQuestion?.preguntas_si_no?.find(sq => sq._id === subQuestionId);
+
+            // Incluir el ID de la subpregunta y su texto para depuración
+            console.log('Subpregunta encontrada:', subQuestion);
+
             answersArray.push({
               pregunta: questionId,
-              // No incluimos subpregunta porque causa problemas con MongoDB
-              // subpregunta: subQuestionId,
+              subpregunta: subQuestionId,
+              subpregunta_texto: subQuestion?.texto || 'Subpregunta sin texto',
               valor_si_no: answer.valor_si_no
             });
           }
@@ -376,23 +400,16 @@ const FeedbackResponse = () => {
             <div className="progress-container">
               <span className="progress-text">{progress}% completado</span>
               <ProgressBar now={progress} variant="primary" className="custom-progress" />
-            </div>
-          </div>
-        </div>
-
-        {/* Información del empleado */}
-        <div className="employee-info mb-3">
-          <Row>
-            <Col md={6}>
-              <p className="mb-1"><strong>Empleado:</strong> {feedback?.empleado?.nombre_completo || 'N/A'}</p>
-            </Col>
-            <Col md={6}>
-              {feedback?.empresa?.nombre && (
-                <p></p>
-              )}
-            </Col>
-          </Row>
-        </div>
+              <div className="employee-info mb-3">
+                <Row>
+                  <Col md={19}>
+                   <p className="mb-1"><strong>Empleado:</strong> {feedback?.empleado?.nombre_completo || 'N/A'}</p>
+                  </Col>
+                </Row>
+             </div>
+           </div>
+         </div>
+       </div>
 
         {/* Categorías de preguntas */}
         {Object.keys(categorizedQuestions).length > 1 && (
@@ -453,6 +470,7 @@ const FeedbackResponse = () => {
                                 type="button"
                                 className={`simple-button no-button ${answers[`${question._id}_${subq._id}`]?.valor_si_no === false ? 'active' : ''}`}
                                 onClick={() => handleYesNoChange(`${question._id}_${subq._id}`, false)}
+                                title="No"
                               >
                                 No
                               </button>
@@ -460,6 +478,7 @@ const FeedbackResponse = () => {
                                 type="button"
                                 className={`simple-button yes-button ${answers[`${question._id}_${subq._id}`]?.valor_si_no === true ? 'active' : ''}`}
                                 onClick={() => handleYesNoChange(`${question._id}_${subq._id}`, true)}
+                                title="Sí"
                               >
                                 Sí
                               </button>
@@ -473,14 +492,15 @@ const FeedbackResponse = () => {
 
                 {/* Preguntas de texto */}
                 {question.tipo_respuesta === 'texto' && (
-                  <Form.Group className="mb-3">
-                    <Form.Control
-                      as="textarea"
-                      rows={3}
+                  <Form.Group className="mb-3 textarea-container">
+                    <textarea
+                      rows={4}
                       placeholder="Escribe tu respuesta aquí..."
                       value={answers[question._id]?.valor_texto || ''}
                       onChange={(e) => handleTextChange(question._id, e.target.value)}
+                      className="resizable-textarea"
                     />
+                    <small className="text-muted mt-2 d-block">* Puedes redimensionar este campo arrastrando la barra inferior hacia abajo.</small>
                   </Form.Group>
                 )}
               </div>

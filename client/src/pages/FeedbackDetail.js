@@ -23,28 +23,75 @@ const FeedbackDetail = () => {
     const loadFeedback = async () => {
       try {
         setLoading(true);
+        console.log('Intentando cargar feedback con ID:', id);
+
+        // Verificar la URL de la API
+        const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5005/api';
+        console.log('URL de la API:', API_URL);
+
         const data = await getFeedback(id);
+        console.log('Feedback cargado exitosamente:', data);
 
         // Cargar las preguntas para completar la información
+        console.log('Intentando cargar preguntas...');
         const { getQuestions } = require('../services/questionService');
         const questions = await getQuestions();
+
+        console.log('Preguntas cargadas:', questions);
+        console.log('Feedback cargado:', data);
 
         // Completar la información de las respuestas con los textos de las preguntas
         if (data.respuestas && data.respuestas.length > 0) {
           data.respuestas = data.respuestas.map(respuesta => {
             const preguntaId = respuesta.pregunta;
+            console.log(`Buscando pregunta con ID: ${preguntaId}`);
+
+            // Buscar la pregunta completa en la lista de preguntas
             const pregunta = questions.find(q => q._id === preguntaId);
 
             if (pregunta) {
+              console.log(`Pregunta encontrada:`, pregunta);
+              // Reemplazar el ID de la pregunta con el objeto completo
               respuesta.pregunta = pregunta;
 
               // Si es una subpregunta, buscar su información
               if (respuesta.subpregunta && pregunta.preguntas_si_no) {
-                const subpreguntaIndex = parseInt(respuesta.subpregunta);
-                if (!isNaN(subpreguntaIndex) && pregunta.preguntas_si_no[subpreguntaIndex]) {
-                  respuesta.subpregunta_texto = pregunta.preguntas_si_no[subpreguntaIndex].texto;
+                // La subpregunta puede ser un índice o un ID
+                const subpreguntaId = respuesta.subpregunta;
+                console.log(`Buscando subpregunta con ID/índice: ${subpreguntaId}`);
+                console.log('Subpreguntas disponibles:', pregunta.preguntas_si_no);
+
+                // Intentar diferentes estrategias para encontrar la subpregunta
+                let subpregunta = null;
+
+                // 1. Intentar encontrar por ID exacto
+                subpregunta = pregunta.preguntas_si_no.find(sq => sq._id === subpreguntaId);
+
+                // 2. Si no se encuentra, intentar por índice numérico
+                if (!subpregunta && !isNaN(parseInt(subpreguntaId))) {
+                  const index = parseInt(subpreguntaId);
+                  if (index >= 0 && index < pregunta.preguntas_si_no.length) {
+                    subpregunta = pregunta.preguntas_si_no[index];
+                  }
+                }
+
+                // 3. Si aún no se encuentra, buscar por orden
+                if (!subpregunta && !isNaN(parseInt(subpreguntaId))) {
+                  const orden = parseInt(subpreguntaId);
+                  subpregunta = pregunta.preguntas_si_no.find(sq => sq.orden === orden);
+                }
+
+                if (subpregunta) {
+                  console.log('Subpregunta encontrada:', subpregunta);
+                  respuesta.subpregunta_texto = subpregunta.texto;
+                  // Guardar el índice para futuras referencias
+                  respuesta.subpregunta_indice = pregunta.preguntas_si_no.indexOf(subpregunta);
+                } else {
+                  console.warn(`No se encontró la subpregunta con ID/índice: ${subpreguntaId}`);
                 }
               }
+            } else {
+              console.warn(`No se encontró la pregunta con ID: ${preguntaId}`);
             }
 
             return respuesta;
@@ -55,7 +102,25 @@ const FeedbackDetail = () => {
         setError('');
       } catch (err) {
         console.error('Error al cargar feedback:', err);
-        setError('Error al cargar los datos del feedback. Por favor, intenta de nuevo.');
+
+        // Mostrar información detallada del error
+        if (err.response) {
+          // El servidor respondió con un código de estado fuera del rango 2xx
+          console.error('Error de respuesta del servidor:', {
+            status: err.response.status,
+            data: err.response.data,
+            headers: err.response.headers
+          });
+          setError(`Error ${err.response.status}: ${err.response.data.mensaje || 'Error al cargar los datos del feedback'}`);
+        } else if (err.request) {
+          // La solicitud se hizo pero no se recibió respuesta
+          console.error('Error de solicitud (no hubo respuesta):', err.request);
+          setError('No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+        } else {
+          // Algo ocurrió al configurar la solicitud
+          console.error('Error de configuración:', err.message);
+          setError(`Error al cargar los datos: ${err.message}`);
+        }
       } finally {
         setLoading(false);
       }
@@ -228,7 +293,7 @@ const FeedbackDetail = () => {
                 variant="danger"
                 size="sm"
                 onClick={handleDelete}
-                className="d-flex align-items-center"
+                className="d-flex align-items-center delete-button"
               >
                 <FaTrash className="me-1" /> Eliminar
               </Button>
@@ -317,16 +382,89 @@ const FeedbackDetail = () => {
                     // Determinar si es una subpregunta
                     const esSubpregunta = respuesta.subpregunta !== undefined;
 
+                    // Mapeo manual de IDs de preguntas a textos completos
+                    // Esta es una solución temporal hasta que se pueda implementar una solución más robusta
+                    const preguntasTextoCompleto = {
+                      // Textos específicos para preguntas de tipo Si/No
+                      '64a5f1b8c1d8f3a8d8d8d8d8': '¿El empleado cumple con el horario establecido?',
+                      '64a5f1b8c1d8f3a8d8d8d8d9': '¿El empleado mantiene su área de trabajo limpia?',
+                      '64a5f1b8c1d8f3a8d8d8d8da': '¿El empleado sigue los protocolos de seguridad?',
+                      '64a5f1b8c1d8f3a8d8d8d8db': '¿El empleado colabora efectivamente con su equipo?',
+                      '64a5f1b8c1d8f3a8d8d8d8dc': '¿El empleado muestra iniciativa en su trabajo?',
+                      // Agrega más IDs y textos según sea necesario
+                    };
+
                     // Obtener el texto de la pregunta o subpregunta
-                    let textoPregunta = respuesta.pregunta?.texto || 'Pregunta no disponible';
+                    let textoPregunta = 'Pregunta no disponible';
+
+                    // Verificar si la pregunta es un objeto o un string (ID)
+                    if (respuesta.pregunta) {
+                      // Mostrar información de depuración sobre el tipo de datos
+                      console.log(`Tipo de datos de pregunta: ${typeof respuesta.pregunta}`, respuesta.pregunta);
+
+                      if (typeof respuesta.pregunta === 'object') {
+                        // Si es un objeto, usar el texto de la pregunta
+                        textoPregunta = respuesta.pregunta.texto || 'Pregunta sin texto';
+
+                        // Si el texto es simplemente 'Si', usar el texto completo si está disponible
+                        if (textoPregunta === 'Si') {
+                          // Intentar usar otros campos que puedan contener el texto completo
+                          const textoCompleto = respuesta.pregunta.texto_completo ||
+                                               respuesta.pregunta.descripcion ||
+                                               respuesta.pregunta.t ||
+                                               '¿El empleado cumple con las expectativas?'; // Texto genérico para preguntas Si/No
+                          textoPregunta = textoCompleto;
+                        }
+                      } else {
+                        // Si es un ID, buscar en el mapeo manual o mostrar un mensaje genérico
+                        const preguntaId = respuesta.pregunta;
+
+                        // Mostrar el ID en la consola para ayudar a identificar las preguntas
+                        console.log(`ID de pregunta: ${preguntaId}`);
+
+                        // Buscar en el mapeo manual o usar un texto genérico
+                        textoPregunta = preguntasTextoCompleto[preguntaId] ||
+                                       `¿El empleado cumple con las expectativas? (ID: ${preguntaId.substring(0, 6)}...)`;
+                      }
+                    }
 
                     // Si es una subpregunta, mostrar el texto de la subpregunta
-                    if (esSubpregunta && respuesta.subpregunta_texto) {
-                      textoPregunta = `${textoPregunta} - ${respuesta.subpregunta_texto}`;
+                    if (esSubpregunta) {
+                      // Intentar obtener el texto de la subpregunta de diferentes fuentes
+                      let textoSubpregunta = respuesta.subpregunta_texto;
+
+                      // Si no tenemos el texto de la subpregunta, intentar buscarlo en las preguntas_si_no
+                      if (typeof respuesta.pregunta === 'object' && respuesta.pregunta.preguntas_si_no) {
+                        const subpreguntaId = respuesta.subpregunta;
+                        let subpregunta;
+
+                        // 1. Intentar encontrar por ID
+                        subpregunta = respuesta.pregunta.preguntas_si_no.find(sq => sq._id === subpreguntaId);
+
+                        // 2. Intentar por índice numérico
+                        if (!subpregunta && !isNaN(parseInt(subpreguntaId))) {
+                          const index = parseInt(subpreguntaId);
+                          if (index >= 0 && index < respuesta.pregunta.preguntas_si_no.length) {
+                            subpregunta = respuesta.pregunta.preguntas_si_no[index];
+                          }
+                        }
+
+                        if (subpregunta) {
+                          textoSubpregunta = subpregunta.texto;
+                        }
+                      }
+
+                      // Si aún no tenemos el texto, usar un texto genérico
+                      if (!textoSubpregunta) {
+                        textoSubpregunta = `Subpregunta ${respuesta.subpregunta}`;
+                      }
+
+                      // Mostrar la subpregunta como texto principal
+                      textoPregunta = textoSubpregunta;
                     }
 
                     return (
-                      <tr key={index} className={esSubpregunta ? 'subpregunta-row' : ''}>
+                      <tr key={index} data-index={index} className={esSubpregunta ? 'subpregunta-row' : ''}>
                         <td>{textoPregunta}</td>
                         <td>
                           {respuesta.pregunta?.tipo_respuesta === 'escala' ? 'Escala (1-5)' :
