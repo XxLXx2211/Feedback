@@ -1,0 +1,51 @@
+services:
+  # Backend API Service
+  - type: web
+    name: evaluacion-semestral-api
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && node app.js
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        # Debe tener el formato: mongodb+srv://usuario:contraseña@cluster.mongodb.net/database
+        sync: false
+      - key: PDF_MONGODB_URI
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        sync: false
+      - key: JWT_SECRET
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        # Debe ser una cadena segura y única para firmar los tokens JWT
+        sync: false
+      - key: GEMINI_API_KEY
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        sync: false
+      - key: LLMWHISPERER_API_KEY
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        sync: false
+      - key: LLMWHISPERER_BASE_URL_V2
+        value: https://llmwhisperer-api.us-central.unstract.com/api/v2
+      - key: PORT
+        value: 10000
+
+  # Frontend Static Site
+  - type: web
+    name: evaluacion-semestral-client
+    env: static
+    plan: free
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: ./client/build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        fromService:
+          name: evaluacion-semestral-api
+          type: web
+          property: url

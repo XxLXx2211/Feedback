@@ -1,0 +1,142 @@
+/* Correcciones para textos en tema claro */
+
+/* Asegurar que los textos sean oscuros en tema claro */
+body,
+p,
+span,
+div,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+label,
+.form-label,
+.form-check-label {
+  color: #333333 !important;
+}
+
+/* Corregir color de texto en la barra de puntuación */
+.score-text {
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+  background-color: transparent !important;
+  font-weight: bold !important;
+}
+
+/* Corregir color de texto en badges */
+.badge {
+  color: white !important;
+}
+
+.badge.bg-light,
+.badge.bg-warning {
+  color: #333333 !important;
+}
+
+/* Corregir color de texto en botones */
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-danger,
+.btn-info,
+.btn-dark {
+  color: white !important;
+}
+
+.btn-light,
+.btn-warning {
+  color: #333333 !important;
+}
+
+/* Corregir color de texto en la tabla */
+.table {
+  color: #333333 !important;
+}
+
+.table thead th {
+  color: #333333 !important;
+}
+
+.table tbody td {
+  color: #333333 !important;
+}
+
+/* Corregir color de texto en la empresa */
+.company-badge {
+  color: white !important;
+}
+
+/* Corregir color de texto en el sidebar */
+.sidebar-link {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.sidebar-link:hover,
+.sidebar-link.active {
+  color: white !important;
+}
+
+/* Corregir color de texto en el tema claro para N/A */
+.badge.bg-info {
+  color: white !important;
+}
+
+/* Corregir color de texto en alertas */
+.alert-success,
+.alert-info,
+.alert-warning,
+.alert-danger {
+  color: #333333 !important;
+}
+
+/* Corregir color de texto en modales */
+.modal-title {
+  color: #333333 !important;
+}
+
+/* Corregir color de texto en dropdowns */
+.dropdown-item {
+  color: #333333 !important;
+}
+
+/* Corregir color de texto en formularios */
+.form-control,
+.form-select,
+input,
+textarea,
+select {
+  color: #333333 !important;
+}
+
+/* Corregir color de texto en placeholders */
+.form-control::placeholder,
+input::placeholder,
+textarea::placeholder {
+  color: #6c757d !important;
+}
+
+/* Corregir color de texto en elementos específicos */
+.employee-name {
+  color: var(--primary-color) !important;
+}
+
+.page-title {
+  color: var(--primary-color) !important;
+}
+
+.page-description {
+  color: var(--text-muted) !important;
+}
+
+/* Corregir color de texto en elementos específicos de la aplicación */
+.question-text,
+.subquestion-text,
+.feedback-title,
+.employee-info,
+.company-info,
+.date-info,
+.status-info {
+  color: #333333 !important;
+}
