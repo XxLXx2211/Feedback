@@ -1,0 +1,43 @@
+services:
+  # Backend API Service
+  - type: web
+    name: pdfeedback-api
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && node app.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: PDF_MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLMWHISPERER_API_KEY
+        sync: false
+      - key: LLMWHISPERER_BASE_URL_V2
+        sync: false
+      - key: PORT
+        value: 10000
+
+  # Frontend Static Site
+  - type: web
+    name: pdfeedback-client
+    env: static
+    plan: free
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: ./client/build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        fromService:
+          name: pdfeedback-api
+          type: web
+          property: url

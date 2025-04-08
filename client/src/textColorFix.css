@@ -1,0 +1,180 @@
+/* Correcciones globales para colores de texto */
+
+/* Tema claro: asegurar que los textos sean oscuros */
+body,
+p,
+span,
+div,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+label,
+.form-label,
+.form-check-label,
+.table,
+.table th,
+.table td,
+.card-title,
+.card-text,
+.fw-bold,
+.fw-normal,
+.fw-light {
+  color: #333333;
+}
+
+/* Tema oscuro: asegurar que los textos sean claros */
+[data-theme='dark'] body,
+[data-theme='dark'] p,
+[data-theme='dark'] span,
+[data-theme='dark'] div,
+[data-theme='dark'] h1,
+[data-theme='dark'] h2,
+[data-theme='dark'] h3,
+[data-theme='dark'] h4,
+[data-theme='dark'] h5,
+[data-theme='dark'] h6,
+[data-theme='dark'] label,
+[data-theme='dark'] .form-label,
+[data-theme='dark'] .form-check-label,
+[data-theme='dark'] .table,
+[data-theme='dark'] .table th,
+[data-theme='dark'] .table td,
+[data-theme='dark'] .card-title,
+[data-theme='dark'] .card-text,
+[data-theme='dark'] .fw-bold,
+[data-theme='dark'] .fw-normal,
+[data-theme='dark'] .fw-light {
+  color: #f0f0f0 !important;
+}
+
+/* Excepciones para texto muted */
+.text-muted {
+  color: #6c757d !important;
+}
+
+[data-theme='dark'] .text-muted {
+  color: #9ca3af !important;
+}
+
+/* Excepciones para badges y botones */
+.badge,
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-danger,
+.btn-info,
+.btn-dark {
+  color: white !important;
+}
+
+.btn-light,
+.btn-warning {
+  color: #333333 !important;
+}
+
+/* Excepciones para la barra de puntuación */
+.score-text {
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Excepciones para enlaces */
+a {
+  color: var(--primary-color) !important;
+}
+
+[data-theme='dark'] a {
+  color: #60a5fa !important;
+}
+
+/* Excepciones para alertas */
+.alert-success,
+.alert-info,
+.alert-warning,
+.alert-danger {
+  color: #333333 !important;
+}
+
+[data-theme='dark'] .alert-success {
+  color: #6ee7b7 !important;
+}
+
+[data-theme='dark'] .alert-danger {
+  color: #fca5a5 !important;
+}
+
+[data-theme='dark'] .alert-warning {
+  color: #fcd34d !important;
+}
+
+[data-theme='dark'] .alert-info {
+  color: #93c5fd !important;
+}
+
+/* Correcciones específicas para elementos de la aplicación */
+[data-theme='dark'] .employee-name {
+  color: #60a5fa !important;
+}
+
+[data-theme='dark'] .page-title {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .page-description {
+  color: #9ca3af !important;
+}
+
+/* Correcciones para elementos específicos de la página de Feedback */
+[data-theme='dark'] .feedback-page .table td {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .feedback-page .fw-bold {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .feedback-page .text-muted {
+  color: #9ca3af !important;
+}
+
+/* Correcciones para elementos específicos de la página de Feedback Detail */
+[data-theme='dark'] .feedback-detail-page .table td {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .feedback-detail-page .fw-bold {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .feedback-detail-page .text-muted {
+  color: #9ca3af !important;
+}
+
+/* Correcciones para elementos específicos de la página de Employees */
+[data-theme='dark'] .employees-page .table td {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .employees-page .fw-bold {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .employees-page .text-muted {
+  color: #9ca3af !important;
+}
+
+/* Correcciones para elementos específicos de la página de Questions */
+[data-theme='dark'] .questions-page .table td {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .questions-page .fw-bold {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .questions-page .text-muted {
+  color: #9ca3af !important;
+}

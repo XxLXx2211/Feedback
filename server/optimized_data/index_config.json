@@ -1,0 +1,173 @@
+{
+  "companies": [
+    {
+      "key": {
+        "n": 1
+      },
+      "options": {
+        "background": true
+      }
+    }
+  ],
+  "employees": [
+    {
+      "key": {
+        "n": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "c": 1
+      },
+      "options": {
+        "unique": true,
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "e": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "a": 1
+      },
+      "options": {
+        "background": true,
+        "sparse": true
+      }
+    }
+  ],
+  "categories": [
+    {
+      "key": {
+        "n": 1
+      },
+      "options": {
+        "unique": true,
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "a": 1
+      },
+      "options": {
+        "background": true,
+        "sparse": true
+      }
+    }
+  ],
+  "questions": [
+    {
+      "key": {
+        "t": "text"
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "c": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "a": 1
+      },
+      "options": {
+        "background": true,
+        "sparse": true
+      }
+    }
+  ],
+  "feedbacks": [
+    {
+      "key": {
+        "e": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "c": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "co": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "f": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "p": -1
+      },
+      "options": {
+        "background": true
+      }
+    }
+  ],
+  "feedbacklinks": [
+    {
+      "key": {
+        "t": 1
+      },
+      "options": {
+        "unique": true,
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "f": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "e": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "a": 1
+      },
+      "options": {
+        "background": true,
+        "sparse": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "feedback-system",
+  "version": "1.0.0",
+  "description": "Sistema de Feedback y Análisis de PDF con IA",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server/app.js",
+    "server": "nodemon server/app.js",
+    "client": "cd client && npm start",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install",
+    "build": "cd client && npm run build",
+    "render-build": "npm run install-all && npm run build",
+    "render-start": "node server/app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "concurrently": "^8.0.1",
+    "dotenv": "^16.4.7",
+    "mongodb": "^6.15.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}

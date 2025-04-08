@@ -1,0 +1,92 @@
+.companies-page {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-title {
+  color: var(--primary-color);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.page-description {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.companies-table {
+  margin-top: 1rem;
+}
+
+.companies-table thead th {
+  background-color: var(--container-bg);
+  color: var(--text-color);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.75rem 1rem;
+}
+
+.companies-table tbody td {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color);
+}
+
+.companies-table tbody tr:hover {
+  background-color: var(--container-bg);
+}
+
+.company-name {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.btn-sm {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Estilos para el modal */
+.modal-header {
+  background-color: var(--container-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-footer {
+  background-color: var(--container-bg);
+  border-top: 1px solid var(--border-color);
+}
+
+.modal-title {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.form-label {
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.form-control {
+  border-color: var(--border-color);
+  color: var(--text-color);
+  background-color: var(--card-bg);
+}
+
+.form-control:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(var(--primary-color-rgb), 0.25);
+}
+
+.form-control::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}

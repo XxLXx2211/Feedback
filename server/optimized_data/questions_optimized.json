@@ -1,0 +1,24 @@
+[
+  {
+    "_id": "60d21b4667d0d8992e610c8b",
+    "t": "¿Los vidrios están limpios?",
+    "r": "s",
+    "i": 4,
+    "c": "60d21b4667d0d8992e610c87",
+    "s": [],
+    "a": true,
+    "creado": "2025-04-05T20:59:32.331Z",
+    "actualizado": "2025-04-05T20:59:32.331Z"
+  },
+  {
+    "_id": "60d21b4667d0d8992e610c8c",
+    "t": "Califica la limpieza general",
+    "r": "e",
+    "i": 3,
+    "c": "60d21b4667d0d8992e610c88",
+    "s": [],
+    "a": true,
+    "creado": "2025-04-05T20:59:32.331Z",
+    "actualizado": "2025-04-05T20:59:32.331Z"
+  }
+]

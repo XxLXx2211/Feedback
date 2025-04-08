@@ -1,0 +1,100 @@
+.employees-page {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-title {
+  color: var(--primary-color);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.page-description {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.table {
+  color: var(--text-color);
+}
+
+.table thead th {
+  background-color: var(--container-bg);
+  color: var(--text-color);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.table tbody tr:hover {
+  background-color: var(--container-bg);
+}
+
+.company-badge {
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+  font-size: 0.85em;
+}
+
+.btn-sm {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-data-icon {
+  font-size: 3rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+/* Estilos para tema oscuro */
+[data-theme='dark'] .table thead th {
+  background-color: #2d3748;
+  color: #f0f0f0;
+  border-bottom-color: #4a5568;
+}
+
+[data-theme='dark'] .table tbody tr:hover {
+  background-color: #2d3748;
+}
+
+[data-theme='dark'] .company-badge {
+  background-color: #3b82f6 !important;
+}
+
+[data-theme='dark'] .modal-content {
+  background-color: #2d3748;
+  color: #f0f0f0;
+}
+
+[data-theme='dark'] .modal-header {
+  border-bottom-color: #4a5568;
+}
+
+[data-theme='dark'] .modal-footer {
+  border-top-color: #4a5568;
+}
+
+[data-theme='dark'] .form-control {
+  background-color: #1a202c;
+  border-color: #4a5568;
+  color: #f0f0f0;
+}
+
+[data-theme='dark'] .form-select {
+  background-color: #1a202c;
+  border-color: #4a5568;
+  color: #f0f0f0;
+}
