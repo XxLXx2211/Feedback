@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Form, Alert, Table, Spinner, Modal, Button } from 'react-bootstrap';
 import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaSearchPlus, FaPaperPlane, FaServer } from 'react-icons/fa';
-import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF } from '../services/pdfService';
+import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF, getViewPdfUrl } from '../services/pdfService';
 import './PDFAnalysis.css';
 
 const PDFAnalysis = () => {
@@ -360,22 +360,21 @@ const PDFAnalysis = () => {
 
   // Manejar visualización de PDF
   const handleViewPDF = (id) => {
-    // Obtener la URL base de la API desde el archivo de configuración
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5009/api';
-    // Abrir el PDF en una nueva pestaña
-    window.open(`${API_URL}/pdf/view/${id}`, '_blank');
+    // Abrir el PDF en una nueva pestaña usando la ruta pública
+    window.open(getViewPdfUrl(id), '_blank');
   };
 
   // Manejar descarga de PDF
   const handleDownloadPDF = async (id) => {
     try {
-      // Obtener el documento
-      const document = await getDocument(id);
+      // Obtener la URL del PDF usando la ruta pública
+      const pdfUrl = getViewPdfUrl(id);
 
-      // Crear un enlace temporal para descargar el PDF
+      // Abrir el PDF en una nueva pestaña para descargarlo
       const link = document.createElement('a');
-      link.href = `data:application/pdf;base64,${document.pdfBase64}`;
-      link.download = document.filename || 'documento.pdf';
+      link.href = pdfUrl;
+      link.download = `documento-${id}.pdf`;
+      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

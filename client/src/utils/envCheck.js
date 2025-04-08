@@ -14,13 +14,13 @@ export const checkEnvironmentVariables = () => {
   // Verificar si la variable REACT_APP_API_URL está definida
   if (!process.env.REACT_APP_API_URL) {
     console.warn('⚠️ ADVERTENCIA: REACT_APP_API_URL no está definida');
-    console.warn(`La aplicación usará la URL por defecto: http://${hostname}:5000/api`);
+    console.warn(`La aplicación usará la URL por defecto: http://${hostname}:5009/api`);
   } else {
     console.log('✅ REACT_APP_API_URL está definida correctamente');
   }
 
   return {
-    REACT_APP_API_URL: process.env.REACT_APP_API_URL || `http://${hostname}:5000/api`,
+    REACT_APP_API_URL: process.env.REACT_APP_API_URL || `http://${hostname}:5009/api`,
     NODE_ENV: process.env.NODE_ENV || 'development'
   };
 };

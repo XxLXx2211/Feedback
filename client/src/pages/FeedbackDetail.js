@@ -56,38 +56,9 @@ const FeedbackDetail = () => {
 
               // Si es una subpregunta, buscar su información
               if (respuesta.subpregunta && pregunta.preguntas_si_no) {
-                // La subpregunta puede ser un índice o un ID
-                const subpreguntaId = respuesta.subpregunta;
-                console.log(`Buscando subpregunta con ID/índice: ${subpreguntaId}`);
-                console.log('Subpreguntas disponibles:', pregunta.preguntas_si_no);
-
-                // Intentar diferentes estrategias para encontrar la subpregunta
-                let subpregunta = null;
-
-                // 1. Intentar encontrar por ID exacto
-                subpregunta = pregunta.preguntas_si_no.find(sq => sq._id === subpreguntaId);
-
-                // 2. Si no se encuentra, intentar por índice numérico
-                if (!subpregunta && !isNaN(parseInt(subpreguntaId))) {
-                  const index = parseInt(subpreguntaId);
-                  if (index >= 0 && index < pregunta.preguntas_si_no.length) {
-                    subpregunta = pregunta.preguntas_si_no[index];
-                  }
-                }
-
-                // 3. Si aún no se encuentra, buscar por orden
-                if (!subpregunta && !isNaN(parseInt(subpreguntaId))) {
-                  const orden = parseInt(subpreguntaId);
-                  subpregunta = pregunta.preguntas_si_no.find(sq => sq.orden === orden);
-                }
-
-                if (subpregunta) {
-                  console.log('Subpregunta encontrada:', subpregunta);
-                  respuesta.subpregunta_texto = subpregunta.texto;
-                  // Guardar el índice para futuras referencias
-                  respuesta.subpregunta_indice = pregunta.preguntas_si_no.indexOf(subpregunta);
-                } else {
-                  console.warn(`No se encontró la subpregunta con ID/índice: ${subpreguntaId}`);
+                const subpreguntaIndex = parseInt(respuesta.subpregunta);
+                if (!isNaN(subpreguntaIndex) && pregunta.preguntas_si_no[subpreguntaIndex]) {
+                  respuesta.subpregunta_texto = pregunta.preguntas_si_no[subpreguntaIndex].texto;
                 }
               }
             } else {
@@ -429,38 +400,8 @@ const FeedbackDetail = () => {
                     }
 
                     // Si es una subpregunta, mostrar el texto de la subpregunta
-                    if (esSubpregunta) {
-                      // Intentar obtener el texto de la subpregunta de diferentes fuentes
-                      let textoSubpregunta = respuesta.subpregunta_texto;
-
-                      // Si no tenemos el texto de la subpregunta, intentar buscarlo en las preguntas_si_no
-                      if (typeof respuesta.pregunta === 'object' && respuesta.pregunta.preguntas_si_no) {
-                        const subpreguntaId = respuesta.subpregunta;
-                        let subpregunta;
-
-                        // 1. Intentar encontrar por ID
-                        subpregunta = respuesta.pregunta.preguntas_si_no.find(sq => sq._id === subpreguntaId);
-
-                        // 2. Intentar por índice numérico
-                        if (!subpregunta && !isNaN(parseInt(subpreguntaId))) {
-                          const index = parseInt(subpreguntaId);
-                          if (index >= 0 && index < respuesta.pregunta.preguntas_si_no.length) {
-                            subpregunta = respuesta.pregunta.preguntas_si_no[index];
-                          }
-                        }
-
-                        if (subpregunta) {
-                          textoSubpregunta = subpregunta.texto;
-                        }
-                      }
-
-                      // Si aún no tenemos el texto, usar un texto genérico
-                      if (!textoSubpregunta) {
-                        textoSubpregunta = `Subpregunta ${respuesta.subpregunta}`;
-                      }
-
-                      // Mostrar la subpregunta como texto principal
-                      textoPregunta = textoSubpregunta;
+                    if (esSubpregunta && respuesta.subpregunta_texto) {
+                      textoPregunta = `${textoPregunta} - ${respuesta.subpregunta_texto}`;
                     }
 
                     return (

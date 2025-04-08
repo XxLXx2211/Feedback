@@ -1,8 +1,7 @@
 import React, { useState, useContext } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
+import { Form, Button, Alert } from 'react-bootstrap';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
-import { login as loginService } from '../services/authService';
 import './Login.css';
 
 const Login = () => {
@@ -24,20 +23,13 @@ const Login = () => {
     setIsLoading(true);
     setError('');
     try {
-      // Llamar al servicio de autenticación
-      const response = await loginService({ username, password });
-
-      // Si la autenticación es exitosa, guardar el token y los datos del usuario
-      if (response && response.token) {
-        const userData = response.user || { username };
-        login(userData, response.token);
-        navigate(from, { replace: true });
-      } else {
-        throw new Error('Respuesta de autenticación inválida');
-      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const userData = { username };
+      const token = 'fake-token-123';
+      login(userData, token);
+      navigate(from, { replace: true });
     } catch (err) {
-      console.error('Error de inicio de sesión:', err);
-      setError(err.response?.data?.message || 'Error al iniciar sesión. Verifica tus credenciales.');
+      setError('Error al iniciar sesión. Verifica tus credenciales.');
     } finally {
       setIsLoading(false);
     }

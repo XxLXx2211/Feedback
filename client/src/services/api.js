@@ -6,26 +6,17 @@ const hostname = window.location.hostname;
 
 // Si estamos accediendo desde una IP, usar esa IP para la API
 // Si estamos en localhost, usar localhost
-// En producción, usar la URL de la API configurada en las variables de entorno
-let API_URL = process.env.REACT_APP_API_URL ||
-  (hostname === 'localhost' ? 'http://localhost:5000/api' :
-   (hostname.includes('netlify.app') ? 'https://sermalite-feedback-api.onrender.com/api' :
-    `http://${hostname}:5000/api`));
+const API_URL = process.env.REACT_APP_API_URL ||
+  (hostname === 'localhost' ? 'http://localhost:5006/api' : `http://${hostname}:5006/api`);
 
-// Forzar la URL de la API en producción para Netlify
-if (hostname.includes('leafy-taiyaki-4f87e4.netlify.app')) {
-  console.log('Detectado dominio de Netlify, forzando URL de API');
-  API_URL = 'https://sermalite-feedback-api.onrender.com/api';
-}
-
-// Asegurarnos de que estamos usando el puerto correcto (5000)
+// Asegurarnos de que estamos usando el puerto correcto (5006)
 
 console.log('API URL configurada:', API_URL);
 console.log('REACT_APP_API_URL desde process.env:', process.env.REACT_APP_API_URL);
 console.log('Hostname detectado:', hostname);
 
 // Configurar tiempo de espera global para las solicitudes
-axios.defaults.timeout = 60000; // 60 segundos
+axios.defaults.timeout = 30000; // 30 segundos
 
 // Verificar si la URL es válida
 if (!API_URL) {
@@ -37,7 +28,7 @@ if (!API_URL) {
 // Crear una instancia de axios con la URL base y timeout
 const API = axios.create({
   baseURL: API_URL,
-  timeout: 30000, // 30 segundos de timeout
+  timeout: 15000, // 15 segundos de timeout
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'

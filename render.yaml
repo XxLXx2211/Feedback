@@ -1,7 +1,7 @@
 services:
   # Backend API Service
   - type: web
-    name: sermalite-feedback-api
+    name: evaluacion-semestral-api
     env: node
     plan: free
     buildCommand: cd server && npm install
@@ -11,15 +11,22 @@ services:
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
-        value: mongodb+srv://Leo:21752009@servicio-sermalite.pvgfgh4.mongodb.net/?retryWrites=true&w=majority&appName=Servicio-Sermalite
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        # Debe tener el formato: mongodb+srv://usuario:contraseña@cluster.mongodb.net/database
+        sync: false
       - key: PDF_MONGODB_URI
-        value: mongodb+srv://xxleoxx2175:ipj3RG8FkPD8n6kq@pdfsfeedback.omghpst.mongodb.net/PDFs?retryWrites=true&w=majority
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        sync: false
       - key: JWT_SECRET
-        value: feedback_system_secret_key_production
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        # Debe ser una cadena segura y única para firmar los tokens JWT
+        sync: false
       - key: GEMINI_API_KEY
-        value: AIzaSyAEzl_JpUv0PrqwFQG1mxZyG7vjS2_Vv_E
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        sync: false
       - key: LLMWHISPERER_API_KEY
-        value: 4KjptuSzKr5nL_BYnA7eJO9IUmiTXCuVx37U1_QiMSo
+        # Asegúrate de configurar esta variable en el dashboard de Render
+        sync: false
       - key: LLMWHISPERER_BASE_URL_V2
         value: https://llmwhisperer-api.us-central.unstract.com/api/v2
       - key: PORT
@@ -27,7 +34,7 @@ services:
 
   # Frontend Static Site
   - type: web
-    name: sermalite-feedback-client
+    name: evaluacion-semestral-client
     env: static
     plan: free
     buildCommand: cd client && npm install && npm run build
@@ -39,6 +46,6 @@ services:
     envVars:
       - key: REACT_APP_API_URL
         fromService:
-          name: sermalite-feedback-api
+          name: evaluacion-semestral-api
           type: web
           property: url

@@ -4,15 +4,7 @@ const cors = require('cors');
 const path = require('path');
 
 // Cargar variables de entorno
-const dotenv = require('dotenv');
-const result = dotenv.config();
-
-if (result.error) {
-  console.error('Error al cargar el archivo .env:', result.error);
-} else {
-  console.log('Variables de entorno cargadas correctamente');
-  console.log('PDF_MONGODB_URI definida:', !!process.env.PDF_MONGODB_URI);
-}
+require('dotenv').config();
 
 const { connectMainDatabase } = require('./config/database');
 
@@ -22,7 +14,6 @@ const { connectMainDatabase } = require('./config/database');
 const { checkDatabaseConnection } = require('./middleware/databaseCheck');
 
 // Importar rutas
-const authRoutes = require('./routes/auth');
 const companyRoutes = require('./routes/companies');
 const employeeRoutes = require('./routes/employees');
 const questionRoutes = require('./routes/questions');
@@ -30,44 +21,23 @@ const feedbackRoutes = require('./routes/feedback');
 const dashboardRoutes = require('./routes/dashboard');
 const categoryRoutes = require('./routes/categories');
 const pdfRoutes = require('./routes/pdfRoutes');
+const publicPdfRoutes = require('./routes/publicPdfRoutes');
 
 // Inicializar app
 const app = express();
-const PORT = process.env.PORT || 5000; // Usar el puerto 5000 por defecto
+const PORT = 5009; // Forzar el puerto 5006
 
 // Middleware
-// Configuración de CORS
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://sermalite-feedback.netlify.app',
-  'https://sermalite-feedback-client.onrender.com',
-  'https://leafy-taiyaki-4f87e4.netlify.app'
-];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Permitir solicitudes sin origen (como aplicaciones móviles o curl)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-      callback(null, true);
-    } else {
-      console.log('Origen bloqueado por CORS:', origin);
-      callback(new Error('No permitido por CORS'));
-    }
-  },
-  credentials: true,
-  optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
+// Configuración de CORS - Permitir todas las solicitudes en cualquier entorno
+console.log('Permitiendo todas las solicitudes CORS para facilitar el desarrollo');
+app.use(cors({
+  origin: true, // Permitir solicitudes desde cualquier origen con credenciales
+  credentials: true
+}));
 
 // Middleware para manejar errores de CORS
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -81,20 +51,17 @@ app.use(express.urlencoded({ extended: true }));
 // Servir archivos estáticos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Importar middleware de autenticación
-const { authenticateToken } = require('./middleware/auth');
+// Configurar rutas públicas (sin autenticación)
+app.use('/api/pdf/public', checkDatabaseConnection, publicPdfRoutes);
 
-// Configurar rutas de autenticación (sin verificación de conexión a la base de datos)
-app.use('/api/auth', authRoutes);
-
-// Configurar rutas API con verificación de conexión a la base de datos y autenticación
-app.use('/api/companies', checkDatabaseConnection, authenticateToken, companyRoutes);
-app.use('/api/employees', checkDatabaseConnection, authenticateToken, employeeRoutes);
-app.use('/api/questions', checkDatabaseConnection, authenticateToken, questionRoutes);
-app.use('/api/feedback', checkDatabaseConnection, feedbackRoutes); // No requiere autenticación para permitir respuestas anónimas
-app.use('/api/dashboard', checkDatabaseConnection, authenticateToken, dashboardRoutes);
-app.use('/api/categories', checkDatabaseConnection, authenticateToken, categoryRoutes);
-app.use('/api/pdf', checkDatabaseConnection, authenticateToken, pdfRoutes);
+// Configurar rutas API con verificación de conexión a la base de datos
+app.use('/api/companies', checkDatabaseConnection, companyRoutes);
+app.use('/api/employees', checkDatabaseConnection, employeeRoutes);
+app.use('/api/questions', checkDatabaseConnection, questionRoutes);
+app.use('/api/feedback', checkDatabaseConnection, feedbackRoutes);
+app.use('/api/dashboard', checkDatabaseConnection, dashboardRoutes);
+app.use('/api/categories', checkDatabaseConnection, categoryRoutes);
+app.use('/api/pdf', checkDatabaseConnection, pdfRoutes);
 
 // Configurar conexión a MongoDB
 if (process.env.NODE_ENV === 'development') {
@@ -109,17 +76,16 @@ if (process.env.NODE_ENV === 'development') {
 
   // Manejar el cierre del servidor
   const closeServer = () => {
-    server.close(async () => {
+    server.close(() => {
       console.log('Servidor HTTP cerrado.');
       if (mongoose.connection.readyState === 1) {
-        try {
-          await mongoose.connection.close(false);
+        mongoose.connection.close(false, () => {
           console.log('Conexiones a MongoDB cerradas.');
-        } catch (err) {
-          console.error('Error al cerrar conexiones a MongoDB:', err);
-        }
+          process.exit(0);
+        });
+      } else {
+        process.exit(0);
       }
-      process.exit(0);
     });
   };
 
@@ -247,11 +213,6 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Endpoint de salud para Render
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'healthy' });
-});
-
 // Ruta para verificar la conexión a MongoDB Atlas
 app.get('/api/check-mongodb-atlas', async (req, res) => {
   try {
@@ -305,30 +266,28 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Manejar cierre gracioso del servidor
-process.on('SIGTERM', async () => {
+process.on('SIGTERM', () => {
   console.log('Recibida señal SIGTERM. Cerrando servidor...');
   // Cerrar conexiones a la base de datos
   if (mongoose.connection.readyState === 1) {
-    try {
-      await mongoose.connection.close(false);
+    mongoose.connection.close(false, () => {
       console.log('Conexiones a MongoDB cerradas.');
-    } catch (err) {
-      console.error('Error al cerrar conexiones a MongoDB:', err);
-    }
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
   }
-  process.exit(0);
 });
 
-process.on('SIGINT', async () => {
+process.on('SIGINT', () => {
   console.log('Recibida señal SIGINT. Cerrando servidor...');
   // Cerrar conexiones a la base de datos
   if (mongoose.connection.readyState === 1) {
-    try {
-      await mongoose.connection.close(false);
+    mongoose.connection.close(false, () => {
       console.log('Conexiones a MongoDB cerradas.');
-    } catch (err) {
-      console.error('Error al cerrar conexiones a MongoDB:', err);
-    }
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
   }
-  process.exit(0);
 });

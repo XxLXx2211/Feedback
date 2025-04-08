@@ -239,41 +239,19 @@ exports.getFeedbackByToken = async (req, res) => {
       updatedAt: link.f.actualizado
     } : null;
 
-    const transformedQuestions = questions.map(q => {
-      // Crear un objeto transformado para cada pregunta
-      const transformedQuestion = {
-        _id: q._id,
-        texto: q.t,
-        tipo_respuesta: q.r === 'e' ? 'escala' : q.r === 's' ? 'si_no' : 'texto',
-        importancia: q.i,
-        categoria: q.c,
-        activo: q.a
-      };
-
-      // Procesar las subpreguntas si existen
-      if (q.s && q.s.length > 0) {
-        // Asignar un ID único a cada subpregunta basado en su índice
-        // Este ID se usará para identificar la subpregunta en las respuestas
-        transformedQuestion.preguntas_si_no = q.s.map((sq, index) => {
-          const subQuestionId = String(index); // Convertir a string para evitar problemas de tipo
-          return {
-            _id: subQuestionId,
-            texto: sq.t,
-            orden: sq.o
-          };
-        });
-
-        // Imprimir información de depuración sobre las subpreguntas
-        console.log(`Pregunta ${q._id} (${q.t}) tiene ${q.s.length} subpreguntas:`);
-        transformedQuestion.preguntas_si_no.forEach(sq => {
-          console.log(`  Subpregunta ${sq._id}: ${sq.texto}`);
-        });
-      } else {
-        transformedQuestion.preguntas_si_no = [];
-      }
-
-      return transformedQuestion;
-    });
+    const transformedQuestions = questions.map(q => ({
+      _id: q._id,
+      texto: q.t,
+      tipo_respuesta: q.r === 'e' ? 'escala' : q.r === 's' ? 'si_no' : 'texto',
+      importancia: q.i,
+      categoria: q.c,
+      preguntas_si_no: q.s ? q.s.map((sq, index) => ({
+        _id: `${index}`, // Añadimos un ID único basado en el índice
+        texto: sq.t,
+        orden: sq.o
+      })) : [],
+      activo: q.a
+    }));
 
     res.status(200).json({
       link: transformedLink,
@@ -316,12 +294,7 @@ exports.submitAnswers = async (req, res) => {
 
       // Agregar subpregunta si existe
       if (resp.subpregunta) {
-        // Asegurarse de que la subpregunta sea un string
-        respuestaObj.sq = String(resp.subpregunta);
-        // Guardar el texto de la subpregunta para depuración si está disponible
-        if (resp.subpregunta_texto) {
-          console.log(`Procesando subpregunta: ${resp.subpregunta_texto}`);
-        }
+        respuestaObj.sq = resp.subpregunta;
       }
 
       // Agregar el valor según el tipo de respuesta
@@ -335,10 +308,6 @@ exports.submitAnswers = async (req, res) => {
 
       return respuestaObj;
     });
-
-    // Imprimir las respuestas para depuración
-    console.log('Respuestas recibidas:', JSON.stringify(respuestas, null, 2));
-    console.log('Respuestas procesadas:', JSON.stringify(respuestasAbreviadas, null, 2));
 
     // Calcular puntuación
     let puntuacion = 100; // Puntuación inicial
@@ -378,19 +347,6 @@ exports.submitAnswers = async (req, res) => {
     });
   } catch (error) {
     console.error('Error al enviar respuestas:', error);
-
-    // Proporcionar un mensaje de error más detallado
-    let errorMessage = 'Error al procesar las respuestas';
-
-    if (error.name === 'ValidationError') {
-      errorMessage = 'Error de validación: ' + Object.values(error.errors).map(e => e.message).join(', ');
-    } else if (error.name === 'CastError') {
-      errorMessage = `Error de tipo: No se puede convertir ${error.path} al tipo esperado`;
-    }
-
-    res.status(500).json({
-      error: errorMessage,
-      details: error.message
-    });
+    res.status(500).json({ error: 'Error al procesar las respuestas' });
   }
 };

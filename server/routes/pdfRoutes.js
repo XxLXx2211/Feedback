@@ -45,13 +45,13 @@ const upload = multer({
   }
 });
 
-// Rutas
+// Rutas protegidas (requieren autenticación)
 router.post('/upload', upload.single('file'), pdfController.uploadPDF);
 router.get('/documents', pdfController.getDocuments);
-router.get('/documents/:id', pdfController.getDocument);
+// La ruta /documents/:id se ha movido a publicPdfRoutes.js
 router.delete('/documents/:id', pdfController.deleteDocument);
 router.post('/analyze/:id', pdfController.analyzePDF);
-router.get('/view/:id', pdfController.viewPDF); // Ruta para ver el PDF sin descargar
+// La ruta /view/:id se ha movido a publicPdfRoutes.js
 router.get('/analysis/:id', pdfController.getDocumentAnalysis); // Ruta para obtener el análisis detallado
 router.post('/chat/:id', pdfController.chatWithPDF); // Ruta para chatear con el PDF
 

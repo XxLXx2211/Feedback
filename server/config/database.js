@@ -31,29 +31,19 @@ const connectMainDatabase = async () => {
     console.log('Intentando conectar a la base de datos principal...');
     console.log(`URI: ${MONGODB_URI.replace(/:[^:]*@/, ':****@')}`);
 
+    // Opciones de conexión mínimas para evitar problemas de compatibilidad
+    const mongooseOptions = {}; // Sin opciones para usar los valores por defecto de Mongoose
+
     // Intentar conectar directamente con Mongoose
     console.log('Intentando conectar con Mongoose...');
 
-    // Sistema de reintentos mejorado
-    let retries = 5; // Aumentado a 5 intentos
+    // Sistema de reintentos simplificado
+    let retries = 3; // Reducido a 3 intentos para evitar esperas largas
     let lastError = null;
-
-    // Opciones de conexión mejoradas
-    const mongooseOptions = {
-      serverSelectionTimeoutMS: 30000, // 30 segundos para la selección del servidor
-      socketTimeoutMS: 45000, // 45 segundos para operaciones de socket
-      connectTimeoutMS: 30000, // 30 segundos para la conexión inicial
-      keepAlive: true,
-      keepAliveInitialDelay: 300000, // 5 minutos
-      maxPoolSize: 10, // Máximo de 10 conexiones en el pool
-      minPoolSize: 1, // Mínimo de 1 conexión en el pool
-      retryWrites: true,
-      w: 'majority'
-    };
 
     while (retries > 0) {
       try {
-        // Intentar la conexión con las opciones mejoradas
+        // Intentar la conexión con las opciones mínimas
         await mongoose.connect(MONGODB_URI, mongooseOptions);
         console.log('Conectado exitosamente a la base de datos principal con Mongoose');
 
@@ -77,13 +67,11 @@ const connectMainDatabase = async () => {
         retries--;
 
         if (retries > 0) {
-          console.log(`Error al conectar a la base de datos principal (intento ${5-retries}/5). Reintentando...`);
+          console.log(`Error al conectar a la base de datos principal (intento ${3-retries}/3). Reintentando...`);
           console.error('Detalles del error:', attemptError.message);
 
-          // Esperar tiempo progresivo antes de reintentar (3s, 6s, 9s, 12s)
-          const waitTime = (5-retries) * 3000;
-          console.log(`Esperando ${waitTime/1000} segundos antes de reintentar...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+          // Esperar 3 segundos antes de reintentar
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
       }
     }

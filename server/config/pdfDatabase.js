@@ -39,29 +39,19 @@ const connectPDFDatabase = async () => {
     console.log(`Intentando conectar a la base de datos de PDFs...`);
     console.log(`URI: ${PDF_MONGODB_URI.replace(/:[^:]*@/, ':****@')}`);
 
+    // Opciones de conexión mínimas para evitar problemas de compatibilidad
+    const mongooseOptions = {}; // Sin opciones para usar los valores por defecto de Mongoose
+
     // Intentar conectar directamente con Mongoose
     console.log('Intentando conectar con Mongoose para PDFs...');
 
-    // Sistema de reintentos mejorado
-    let retries = 5; // Aumentado a 5 intentos
+    // Sistema de reintentos simplificado
+    let retries = 3; // Reducido a 3 intentos para evitar esperas largas
     let lastError = null;
-
-    // Opciones de conexión mejoradas
-    const mongooseOptions = {
-      serverSelectionTimeoutMS: 30000, // 30 segundos para la selección del servidor
-      socketTimeoutMS: 45000, // 45 segundos para operaciones de socket
-      connectTimeoutMS: 30000, // 30 segundos para la conexión inicial
-      keepAlive: true,
-      keepAliveInitialDelay: 300000, // 5 minutos
-      maxPoolSize: 10, // Máximo de 10 conexiones en el pool
-      minPoolSize: 1, // Mínimo de 1 conexión en el pool
-      retryWrites: true,
-      w: 'majority'
-    };
 
     while (retries > 0) {
       try {
-        // Intentar la conexión con las opciones mejoradas
+        // Intentar la conexión con las opciones mínimas
         pdfConnection = await mongoose.createConnection(PDF_MONGODB_URI, mongooseOptions);
         console.log('Conectado exitosamente a la base de datos de PDFs con Mongoose');
 
