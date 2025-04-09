@@ -3,6 +3,9 @@
   publish = "build/"
   command = "npm run build"
 
+[context.production]
+  branch = "Final"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
