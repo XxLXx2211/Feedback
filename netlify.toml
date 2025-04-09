@@ -13,3 +13,4 @@
 
 [build.environment]
   REACT_APP_API_URL = "https://pdfeedback-api.onrender.com"
+  CI = "false"
