@@ -210,6 +210,32 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// Ruta de verificación de salud adicional
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    message: 'El servidor está funcionando correctamente',
+    time: new Date().toISOString()
+  });
+});
+
+// Ruta raíz de la API
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'Bienvenido a la API del Sistema de Feedback',
+    version: '1.0.0',
+    endpoints: [
+      '/api/companies',
+      '/api/employees',
+      '/api/questions',
+      '/api/feedback',
+      '/api/dashboard',
+      '/api/categories',
+      '/api/pdf'
+    ]
+  });
+});
+
 // Ruta para verificar la conexión a MongoDB Atlas
 app.get('/api/check-mongodb-atlas', async (req, res) => {
   try {
