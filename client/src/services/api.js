@@ -4,10 +4,11 @@ import axios from 'axios';
 // Usar la IP del host actual en lugar de localhost para evitar problemas de CORS
 const hostname = window.location.hostname;
 
-// Si estamos accediendo desde una IP, usar esa IP para la API
-// Si estamos en localhost, usar localhost
-const API_URL = process.env.REACT_APP_API_URL ||
-  (hostname === 'localhost' ? 'http://localhost:5000/api' : `http://${hostname}:5000/api`);
+// Definir la URL de la API directamente para evitar problemas
+const API_URL = 'https://evaluacion-semestral-api.onrender.com/api';
+
+// Imprimir la URL para depuración
+console.log('Usando URL de API hardcodeada:', API_URL);
 
 // Asegurarnos de que estamos usando el puerto correcto (5000)
 
