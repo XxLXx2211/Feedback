@@ -186,6 +186,15 @@ if (process.env.NODE_ENV === 'development') {
 
 // Las rutas API ya están configuradas antes de iniciar el servidor
 
+// Ruta raíz para verificar que el servidor está funcionando
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'Servidor del Sistema de Feedback funcionando correctamente',
+    time: new Date().toISOString()
+  });
+});
+
 // Ruta de estado (no requiere conexión a la base de datos)
 app.get('/api/status', (req, res) => {
   const dbStatus = mongoose.connection.readyState;
