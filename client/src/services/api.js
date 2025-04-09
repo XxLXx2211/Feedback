@@ -5,10 +5,24 @@ import axios from 'axios';
 const hostname = window.location.hostname;
 
 // Definir la URL de la API directamente para evitar problemas
+// Usar la URL de Render con el puerto 10000
 const API_URL = 'https://evaluacion-semestral-api.onrender.com/api';
 
 // Imprimir la URL para depuración
 console.log('Usando URL de API hardcodeada:', API_URL);
+
+// Intentar hacer una solicitud de prueba para verificar la conexión
+fetch(API_URL.replace('/api', '') + '/')
+  .then(response => {
+    console.log('Respuesta de prueba del servidor:', response.status);
+    return response.json();
+  })
+  .then(data => {
+    console.log('Datos de prueba del servidor:', data);
+  })
+  .catch(error => {
+    console.error('Error al conectar con el servidor:', error);
+  });
 
 // Asegurarnos de que estamos usando el puerto correcto (5000)
 
