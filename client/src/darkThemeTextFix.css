@@ -1,0 +1,293 @@
+/* Correcciones globales para textos en tema oscuro */
+
+/* Textos básicos */
+[data-theme='dark'] body,
+[data-theme='dark'] p,
+[data-theme='dark'] span,
+[data-theme='dark'] div,
+[data-theme='dark'] h1,
+[data-theme='dark'] h2,
+[data-theme='dark'] h3,
+[data-theme='dark'] h4,
+[data-theme='dark'] h5,
+[data-theme='dark'] h6 {
+  color: #f0f0f0;
+}
+
+/* Formularios */
+[data-theme='dark'] .form-control,
+[data-theme='dark'] .form-select,
+[data-theme='dark'] input,
+[data-theme='dark'] textarea,
+[data-theme='dark'] select {
+  color: #f0f0f0 !important;
+  background-color: #1a202c !important;
+  border-color: #4a5568 !important;
+}
+
+[data-theme='dark'] .form-control:focus,
+[data-theme='dark'] .form-select:focus,
+[data-theme='dark'] input:focus,
+[data-theme='dark'] textarea:focus,
+[data-theme='dark'] select:focus {
+  background-color: #2d3748 !important;
+  border-color: #4f46e5 !important;
+  box-shadow: 0 0 0 0.2rem rgba(79, 70, 229, 0.25) !important;
+}
+
+[data-theme='dark'] .form-control::placeholder,
+[data-theme='dark'] input::placeholder,
+[data-theme='dark'] textarea::placeholder {
+  color: #718096 !important;
+}
+
+/* Etiquetas y textos de formularios */
+[data-theme='dark'] .form-check-label,
+[data-theme='dark'] .form-label,
+[data-theme='dark'] label {
+  color: #e2e8f0 !important;
+}
+
+/* Checkboxes y radios */
+[data-theme='dark'] .form-check-input {
+  background-color: #2d3748 !important;
+  border-color: #4a5568 !important;
+}
+
+[data-theme='dark'] .form-check-input:checked {
+  background-color: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+}
+
+/* Tarjetas */
+[data-theme='dark'] .card {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme='dark'] .card-header {
+  background-color: rgba(0, 0, 0, 0.1) !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme='dark'] .card-footer {
+  background-color: rgba(0, 0, 0, 0.1) !important;
+  border-top-color: #334155 !important;
+}
+
+[data-theme='dark'] .card-title {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .card-text {
+  color: #e2e8f0 !important;
+}
+
+/* Tablas */
+[data-theme='dark'] .table {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .table thead th {
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .table tbody td {
+  color: #f0f0f0 !important;
+}
+
+/* Botones */
+[data-theme='dark'] .btn {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .btn-primary {
+  background-color: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+}
+
+[data-theme='dark'] .btn-secondary {
+  background-color: #4b5563 !important;
+  border-color: #4b5563 !important;
+}
+
+[data-theme='dark'] .btn-success {
+  background-color: #10b981 !important;
+  border-color: #10b981 !important;
+}
+
+[data-theme='dark'] .btn-danger {
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+
+[data-theme='dark'] .btn-warning {
+  background-color: #f59e0b !important;
+  border-color: #f59e0b !important;
+  color: #1a202c !important;
+}
+
+[data-theme='dark'] .btn-info {
+  background-color: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+}
+
+[data-theme='dark'] .btn-light {
+  background-color: #4b5563 !important;
+  border-color: #4b5563 !important;
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .btn-dark {
+  background-color: #1a202c !important;
+  border-color: #1a202c !important;
+}
+
+[data-theme='dark'] .btn-outline-primary {
+  color: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+}
+
+[data-theme='dark'] .btn-outline-primary:hover {
+  background-color: #4f46e5 !important;
+  color: #f0f0f0 !important;
+}
+
+/* Listas */
+[data-theme='dark'] .list-group-item {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f0f0f0 !important;
+}
+
+/* Dropdowns */
+[data-theme='dark'] .dropdown-menu {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme='dark'] .dropdown-item {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .dropdown-item:hover {
+  background-color: #2d3748 !important;
+}
+
+/* Modales */
+[data-theme='dark'] .modal-content {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme='dark'] .modal-header {
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme='dark'] .modal-footer {
+  border-top-color: #334155 !important;
+}
+
+[data-theme='dark'] .modal-title {
+  color: #f0f0f0 !important;
+}
+
+/* Alertas */
+[data-theme='dark'] .alert {
+  color: #f0f0f0 !important;
+}
+
+/* Badges */
+[data-theme='dark'] .badge {
+  color: #f0f0f0 !important;
+}
+
+/* Tooltips */
+[data-theme='dark'] .tooltip {
+  color: #f0f0f0 !important;
+}
+
+/* Popovers */
+[data-theme='dark'] .popover {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme='dark'] .popover-header {
+  background-color: #2d3748 !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme='dark'] .popover-body {
+  color: #f0f0f0 !important;
+}
+
+/* Navegación */
+[data-theme='dark'] .nav-link {
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .nav-link:hover {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .nav-tabs {
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme='dark'] .nav-tabs .nav-link.active {
+  background-color: #1e293b !important;
+  border-color: #334155 #334155 #1e293b !important;
+  color: #f0f0f0 !important;
+}
+
+/* Paginación */
+[data-theme='dark'] .pagination .page-link {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .pagination .page-item.active .page-link {
+  background-color: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+}
+
+/* Correcciones específicas para elementos de formulario */
+[data-theme='dark'] select option {
+  background-color: #1a202c !important;
+  color: #f0f0f0 !important;
+}
+
+/* Correcciones para textos en elementos específicos */
+[data-theme='dark'] .text-dark {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .text-body {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .text-muted {
+  color: #9ca3af !important;
+}
+
+/* Correcciones para enlaces */
+[data-theme='dark'] a {
+  color: #60a5fa !important;
+}
+
+[data-theme='dark'] a:hover {
+  color: #93c5fd !important;
+}
+
+/* Correcciones para textos en elementos específicos de la aplicación */
+[data-theme='dark'] .question-text,
+[data-theme='dark'] .subquestion-text,
+[data-theme='dark'] .feedback-title,
+[data-theme='dark'] .employee-info,
+[data-theme='dark'] .company-info,
+[data-theme='dark'] .date-info,
+[data-theme='dark'] .status-info {
+  color: #f0f0f0 !important;
+}

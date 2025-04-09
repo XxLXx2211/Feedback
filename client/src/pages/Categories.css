@@ -1,0 +1,54 @@
+.categories-page {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-title {
+  color: var(--primary-color);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.page-description {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.no-data-icon {
+  font-size: 3rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.category-name {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.btn-sm {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.category-questions-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.question-item {
+  background-color: var(--container-bg);
+  transition: all 0.2s ease;
+}
+
+.question-item:hover {
+  background-color: rgba(var(--primary-color-rgb), 0.05);
+}

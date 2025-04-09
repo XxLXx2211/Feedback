@@ -1,0 +1,84 @@
+/* Estilos para el botón de cambio de tema */
+.theme-toggle-btn {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-toggle-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+/* Tema claro */
+.theme-toggle-btn.theme-light {
+  color: #4f46e5;
+  background-color: rgba(79, 70, 229, 0.1);
+}
+
+.theme-toggle-btn.theme-light:hover {
+  background-color: rgba(79, 70, 229, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Tema oscuro */
+.theme-toggle-btn.theme-dark {
+  color: #fbbf24;
+  background-color: rgba(251, 191, 36, 0.2);
+}
+
+.theme-toggle-btn.theme-dark:hover {
+  background-color: rgba(251, 191, 36, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Efecto de onda al hacer clic */
+.theme-toggle-btn::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: currentColor;
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0);
+  transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+.theme-toggle-btn:active::after {
+  transform: scale(2);
+  opacity: 0.1;
+  transition: 0s;
+}
+
+/* Estilos específicos para el sidebar */
+.sidebar .theme-toggle-btn {
+  color: white;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin: 0.5rem auto;
+}
+
+.sidebar .theme-toggle-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Animación para los iconos */
+.theme-toggle-btn svg {
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle-btn:hover svg {
+  transform: rotate(12deg);
+}

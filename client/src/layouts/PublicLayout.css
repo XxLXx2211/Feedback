@@ -1,0 +1,35 @@
+.public-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #ffffff;
+}
+
+.public-content {
+  flex: 1;
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.public-footer {
+  background-color: #ffffff;
+  border-top: 1px solid #e9ecef;
+  padding: 15px 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+/* Estilos para tema oscuro */
+.dark-mode .public-layout {
+  background-color: #121212;
+  color: #f0f0f0;
+}
+
+.dark-mode .public-footer {
+  background-color: #1e1e1e;
+  border-top-color: #333;
+  color: #aaa;
+}
