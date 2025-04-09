@@ -398,7 +398,7 @@ const FeedbackResponse = () => {
             </div>
             <h1 className="page-title">Formulario de Feedback</h1>
             <p className="page-description">
-              Tu opinión es importante para nosotros. Por favor, responde las siguientes preguntas.
+              Su opinión es importante para nosotros. Por favor, responde las siguientes preguntas.
             </p>
           </div>
         </div>
