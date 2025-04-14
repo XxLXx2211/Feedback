@@ -61,6 +61,8 @@ const Feedback = () => {
     }
   };
 
+
+
   // Función para crear un enlace de feedback
   const handleCreateLink = async (id) => {
     try {
@@ -231,6 +233,8 @@ const Feedback = () => {
                                 <FaLink />
                               )}
                             </Button>
+
+
 
                             <Button
                               variant="danger"

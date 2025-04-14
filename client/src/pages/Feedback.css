@@ -130,6 +130,10 @@
   background-color: #ef4444; /* Rojo */
 }
 
+.btn-action.btn-secondary {
+  background-color: #6b7280; /* Gris */
+}
+
 .btn-new-feedback {
   background-color: #2563eb; /* Azul */
   border: none;
