@@ -4,9 +4,9 @@ import axios from 'axios';
 // Usar la IP del host actual en lugar de localhost para evitar problemas de CORS
 const hostname = window.location.hostname;
 
-// Definir la URL de la API directamente para evitar problemas
-// Usar la URL local para desarrollo
-const API_URL = 'http://localhost:5000/api';
+// Definir la URL de la API usando la variable de entorno
+// Usar la URL de producción para el despliegue
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // Imprimir la URL para depuración
 console.log('Usando URL de API hardcodeada:', API_URL);
