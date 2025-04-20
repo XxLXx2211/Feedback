@@ -185,11 +185,51 @@ export const getDocuments = async (options = {}) => {
  */
 export const getDocument = async (id) => {
   try {
-    const response = await API.get(`/pdf/documents/${id}`);
+    // Configurar un timeout para la solicitud
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
+
+    const response = await API.get(`/pdf/documents/${id}`, {
+      signal: controller.signal,
+      timeout: 15000, // 15 segundos de timeout
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+
+    // Limpiar el timeout
+    clearTimeout(timeoutId);
+
     return response.data;
   } catch (error) {
     console.error(`Error al obtener documento ${id}:`, error.response ? error.response.data : error.message);
-    throw error;
+
+    // Manejar errores de timeout
+    if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+      return {
+        error: true,
+        errorMessage: 'El servidor tardó demasiado en responder. Por favor, intenta de nuevo más tarde.',
+        status: 'timeout'
+      };
+    }
+
+    // Manejar errores de red
+    if (error.message && error.message.includes('Network Error')) {
+      return {
+        error: true,
+        errorMessage: 'Error de conexión con el servidor. Por favor, verifica tu conexión a internet.',
+        status: 'network_error'
+      };
+    }
+
+    // Devolver un objeto de error formateado para que la interfaz pueda manejarlo
+    return {
+      error: true,
+      errorMessage: error.response ? error.response.data.error : error.message,
+      status: 'error'
+    };
   }
 };
 
@@ -200,11 +240,44 @@ export const getDocument = async (id) => {
  */
 export const deleteDocument = async (id) => {
   try {
-    const response = await API.delete(`/pdf/documents/${id}`);
+    // Configurar un timeout para la solicitud
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
+
+    const response = await API.delete(`/pdf/documents/${id}`, {
+      signal: controller.signal,
+      timeout: 15000 // 15 segundos de timeout
+    });
+
+    // Limpiar el timeout
+    clearTimeout(timeoutId);
+
     return response.data;
   } catch (error) {
     console.error(`Error al eliminar documento ${id}:`, error.response ? error.response.data : error.message);
-    throw error;
+
+    // Crear un mensaje de error más descriptivo
+    let errorMessage = 'Error desconocido al eliminar el documento';
+
+    if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+      errorMessage = 'El servidor tardó demasiado en responder. El documento puede haber sido eliminado o no.';
+    } else if (error.message && error.message.includes('Network Error')) {
+      errorMessage = 'Error de conexión con el servidor. Por favor, verifica tu conexión a internet.';
+    } else if (error.response) {
+      // El servidor respondió con un código de error
+      errorMessage = error.response.data.error || `Error ${error.response.status}: ${error.response.statusText}`;
+    } else if (error.request) {
+      // La solicitud se hizo pero no se recibió respuesta
+      errorMessage = 'No se recibió respuesta del servidor. Intenta nuevamente en unos momentos.';
+    } else {
+      // Error al configurar la solicitud
+      errorMessage = error.message;
+    }
+
+    // Crear un nuevo error con el mensaje descriptivo
+    const enhancedError = new Error(errorMessage);
+    enhancedError.originalError = error;
+    throw enhancedError;
   }
 };
 

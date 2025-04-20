@@ -184,35 +184,79 @@ let systemLoad = {
   lastCheck: Date.now()
 };
 
-// Verificar carga del sistema cada 30 segundos
+// Variables para controlar la sobrecarga
+let pauseTimeout = null;
+let consecutiveOverloads = 0;
+let lastResumeTime = Date.now();
+
+// Verificar carga del sistema cada 15 segundos
 setInterval(() => {
   const cpuUsage = os.loadavg()[0]; // Carga promedio de 1 minuto
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();
   const memoryUsage = 1 - (freeMemory / totalMemory);
+  const isCurrentlyOverloaded = cpuUsage > 0.7 || memoryUsage > 0.8; // Umbrales más bajos: 70% CPU o 80% memoria
 
+  // Actualizar estado del sistema
   systemLoad = {
     cpuUsage,
     memoryUsage,
     freeMemoryMB: Math.round(freeMemory / (1024 * 1024)),
-    isOverloaded: cpuUsage > 0.8 || memoryUsage > 0.85, // 80% CPU o 85% memoria
+    isOverloaded: isCurrentlyOverloaded,
+    consecutiveOverloads: isCurrentlyOverloaded ? consecutiveOverloads + 1 : 0,
     lastCheck: Date.now()
   };
 
+  // Actualizar contador de sobrecargas consecutivas
+  if (isCurrentlyOverloaded) {
+    consecutiveOverloads++;
+  } else {
+    consecutiveOverloads = 0;
+  }
+
   // Si el sistema está sobrecargado, pausar temporalmente las colas
   if (systemLoad.isOverloaded) {
-    console.log('Sistema sobrecargado, pausando colas temporalmente');
+    // Limpiar cualquier timeout pendiente
+    if (pauseTimeout) {
+      clearTimeout(pauseTimeout);
+    }
+
+    console.log(`Sistema sobrecargado (CPU: ${Math.round(cpuUsage * 100)}%, Memoria: ${Math.round(memoryUsage * 100)}%), pausando colas temporalmente`);
     pdfProcessingQueue.pause();
     pdfAnalysisQueue.pause();
 
-    // Reanudar después de 30 segundos
-    setTimeout(() => {
-      pdfProcessingQueue.resume();
-      pdfAnalysisQueue.resume();
-      console.log('Colas reanudadas después de pausa por sobrecarga');
-    }, 30000);
+    // Calcular tiempo de pausa basado en sobrecargas consecutivas
+    const pauseTime = Math.min(30000 + (consecutiveOverloads * 5000), 120000); // Entre 30s y 2min
+
+    // Reanudar después del tiempo calculado
+    pauseTimeout = setTimeout(() => {
+      // Verificar nuevamente antes de reanudar
+      const currentCpuUsage = os.loadavg()[0];
+      const currentMemoryUsage = 1 - (os.freemem() / os.totalmem());
+
+      if (currentCpuUsage > 0.8 || currentMemoryUsage > 0.85) {
+        console.log('Sistema aún sobrecargado, extendiendo pausa...');
+        // Extender la pausa otros 30 segundos
+        pauseTimeout = setTimeout(() => {
+          pdfProcessingQueue.resume();
+          pdfAnalysisQueue.resume();
+          console.log('Colas reanudadas después de pausa extendida por sobrecarga');
+          lastResumeTime = Date.now();
+        }, 30000);
+      } else {
+        pdfProcessingQueue.resume();
+        pdfAnalysisQueue.resume();
+        console.log('Colas reanudadas después de pausa por sobrecarga');
+        lastResumeTime = Date.now();
+      }
+    }, pauseTime);
+  } else if (Date.now() - lastResumeTime > 300000) { // 5 minutos desde la última reanudación
+    // Asegurarse de que las colas estén activas si el sistema no está sobrecargado por un tiempo
+    pdfProcessingQueue.resume();
+    pdfAnalysisQueue.resume();
+    lastResumeTime = Date.now();
   }
-}, 30000);
+}, 15000);
 
 // Procesar PDFs (extracción básica de texto)
 pdfProcessingQueue.process(NUM_WORKERS, async (job) => {

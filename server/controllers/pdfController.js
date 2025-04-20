@@ -507,6 +507,22 @@ exports.viewPDF = async (req, res) => {
  * Procesar documento de forma asíncrona con análisis avanzado
  */
 async function processDocument(documentId) {
+  // Verificar si el sistema está sobrecargado antes de iniciar el procesamiento
+  try {
+    const { getQueuesStatus } = require('../services/queueService');
+    const status = await getQueuesStatus();
+
+    if (status.system.isOverloaded) {
+      console.log(`Sistema sobrecargado, posponiendo procesamiento del documento: ${documentId}`);
+      // Programar un nuevo intento en 60 segundos
+      setTimeout(() => processDocument(documentId), 60000);
+      return;
+    }
+  } catch (statusError) {
+    console.error('Error al verificar estado del sistema:', statusError);
+    // Continuar con el procesamiento aunque no podamos verificar el estado
+  }
+
   try {
     console.log(`Iniciando procesamiento del documento: ${documentId}`);
 
@@ -519,6 +535,15 @@ async function processDocument(documentId) {
       console.error(`Documento no encontrado: ${documentId}`);
       return;
     }
+
+    // Verificar si el documento ya está siendo procesado o ya está procesado
+    if (document.s === 'c') { // 'c' = completado/procesado
+      console.log(`Documento ${documentId} ya está procesado, omitiendo procesamiento`);
+      return;
+    }
+
+    // Marcar como en procesamiento para evitar procesamiento duplicado
+    await PDFDocument.findByIdAndUpdate(documentId, { s: 'p' }); // 'p' = procesando
 
     // Preparar el archivo para procesamiento
     let filePath = null;
@@ -604,21 +629,28 @@ async function processDocument(documentId) {
     await document.save();
     console.log(`Documento procesado correctamente: ${documentId}`);
 
+    // Verificar nuevamente si el sistema está sobrecargado antes de iniciar el análisis con Gemini
+    try {
+      const { getQueuesStatus } = require('../services/queueService');
+      const status = await getQueuesStatus();
+
+      if (status.system.isOverloaded) {
+        console.log(`Sistema sobrecargado, posponiendo análisis con Gemini para documento: ${documentId}`);
+        // Programar un nuevo intento en 2 minutos
+        setTimeout(() => {
+          // Solo realizar el análisis con Gemini, no todo el procesamiento
+          performGeminiAnalysis(documentId, extractedText);
+        }, 120000);
+        return;
+      }
+    } catch (statusError) {
+      console.error('Error al verificar estado del sistema para análisis con Gemini:', statusError);
+      // Continuar con el análisis aunque no podamos verificar el estado
+    }
+
     // Realizar análisis con Gemini si hay texto extraído
     if (extractedText && extractedText.length > 0) {
-      try {
-        const geminiAnalysis = await analyzeWithGemini(extractedText);
-        if (geminiAnalysis) {
-          // Actualizar el documento con el análisis de Gemini
-          await PDFDocument.findByIdAndUpdate(documentId, {
-            g: geminiAnalysis // Campo abreviado para análisis de Gemini
-          });
-          console.log(`Análisis con Gemini completado para documento: ${documentId}`);
-        }
-      } catch (geminiError) {
-        console.error(`Error en análisis con Gemini: ${geminiError.message}`);
-        // No marcamos como error el documento, ya que el procesamiento principal fue exitoso
-      }
+      await performGeminiAnalysis(documentId, extractedText);
     }
   } catch (error) {
     console.error(`Error al procesar documento ${documentId}:`, error);
@@ -634,6 +666,39 @@ async function processDocument(documentId) {
     } catch (updateError) {
       console.error(`Error al actualizar estado del documento ${documentId}:`, updateError);
     }
+  }
+}
+
+/**
+ * Realizar análisis con Gemini de forma separada
+ */
+async function performGeminiAnalysis(documentId, extractedText) {
+  try {
+    if (!extractedText || extractedText.length === 0) {
+      console.error(`No hay texto para analizar con Gemini para documento: ${documentId}`);
+      return;
+    }
+
+    console.log(`Enviando prompt a Gemini...`);
+    const geminiAnalysis = await analyzeWithGemini(extractedText);
+
+    if (geminiAnalysis) {
+      // Obtener el modelo PDFDocument
+      const PDFDocument = await getPDFDocumentModel();
+
+      // Actualizar el documento con el análisis de Gemini
+      await PDFDocument.findByIdAndUpdate(documentId, {
+        g: geminiAnalysis // Campo abreviado para análisis de Gemini
+      });
+
+      console.log(`Análisis con Gemini completado: ${geminiAnalysis.length} caracteres`);
+      console.log(`Análisis con Gemini completado para documento: ${documentId}`);
+    } else {
+      console.error(`No se pudo generar análisis con Gemini para documento: ${documentId}`);
+    }
+  } catch (error) {
+    console.error(`Error en análisis con Gemini para documento ${documentId}:`, error);
+    // No marcamos como error el documento, ya que el procesamiento principal fue exitoso
   }
 }
 
