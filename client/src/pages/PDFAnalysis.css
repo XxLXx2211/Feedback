@@ -341,3 +341,42 @@
   background-color: #e2e3e5;
   color: #41464b;
 }
+
+.cleaning-status.loading {
+  background-color: #cff4fc;
+  color: #055160;
+  animation: pulse 1.5s infinite;
+}
+
+.cleaning-status.pending {
+  background-color: #e2e3e5;
+  color: #41464b;
+}
+
+.reload-btn, .fix-btn {
+  transition: transform 0.2s ease;
+}
+
+.reload-btn:hover, .fix-btn:hover {
+  transform: scale(1.2);
+}
+
+.fix-btn {
+  color: #fd7e14;
+}
+
+.fix-btn:hover {
+  color: #e76b00;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}

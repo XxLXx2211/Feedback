@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Form, Alert, Table, Spinner, Modal, Button } from 'react-bootstrap';
 import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaSearchPlus, FaPaperPlane, FaServer, FaSync } from 'react-icons/fa';
-import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF } from '../services/pdfService';
+import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF, fixDocumentAnalysis } from '../services/pdfService';
 import './PDFAnalysis.css';
 
 const PDFAnalysis = () => {
@@ -426,10 +426,10 @@ const PDFAnalysis = () => {
     }
   };
 
-  // Función para cargar el análisis de un documento
-  const loadDocumentAnalysis = async (docId) => {
+  // Función para cargar el análisis de un documento con reintentos automáticos
+  const loadDocumentAnalysis = async (docId, forceRefresh = false) => {
     try {
-      console.log(`Cargando análisis para documento ${docId}...`);
+      console.log(`Cargando análisis para documento ${docId}... ${forceRefresh ? '(Forzando recarga)' : ''}`);
 
       // Verificar si el documento existe en la lista actual
       const docIndex = documents.findIndex(d => d._id === docId);
@@ -438,8 +438,8 @@ const PDFAnalysis = () => {
         return null;
       }
 
-      // Verificar si el documento ya tiene análisis cargado
-      if (documents[docIndex].analysisLoaded && documents[docIndex].geminiAnalysis) {
+      // Verificar si el documento ya tiene análisis cargado y no estamos forzando recarga
+      if (!forceRefresh && documents[docIndex].analysisLoaded && documents[docIndex].geminiAnalysis) {
         console.log(`El documento ${docId} ya tiene análisis cargado`);
         return documents[docIndex].geminiAnalysis;
       }
@@ -466,17 +466,19 @@ const PDFAnalysis = () => {
       updatingDocs[docIndex] = {
         ...updatingDocs[docIndex],
         analysisLoading: true,
-        analysisAttempts: (updatingDocs[docIndex].analysisAttempts || 0) + 1
+        analysisAttempts: (updatingDocs[docIndex].analysisAttempts || 0) + 1,
+        analysisLoadingStartTime: Date.now(), // Añadir marca de tiempo para controlar tiempo de carga
+        autoRetryScheduled: false // Resetear flag de reintento automático
       };
       setDocuments(updatingDocs);
 
       // Configurar un timeout para la carga del análisis
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 20000); // 20 segundos de timeout
+        setTimeout(() => reject(new Error('Timeout')), 15000); // 15 segundos de timeout (reducido para mejor experiencia)
       });
 
-      // Solicitar el análisis al servidor con timeout
-      const analysisPromise = analyzePDF(docId);
+      // Solicitar el análisis al servidor con timeout y parámetro de forzar recarga
+      const analysisPromise = analyzePDF(docId, forceRefresh);
       const response = await Promise.race([analysisPromise, timeoutPromise])
         .catch(error => {
           console.error(`Error o timeout al cargar análisis para documento ${docId}:`, error);
@@ -623,17 +625,46 @@ const PDFAnalysis = () => {
       // Mientras tanto, mostrar estado de carga
       return {
         icon: '⏳',
-        text: 'Cargando...',
+        text: 'Cargando análisis...',
         class: 'loading'
       };
     }
 
     // Si el análisis está cargando, mostrar estado de carga con el número de intento
     if (doc.analysisLoading) {
+      // Si se está corrigiendo el análisis, mostrar mensaje especial
+      if (doc.fixingAnalysis) {
+        return {
+          icon: '🔧', // Emoji de llave inglesa
+          text: 'Corrigiendo análisis...',
+          class: 'loading'
+        };
+      }
+
+      // Si es una recarga forzada, mostrar mensaje especial
+      if (doc.forceReloading) {
+        return {
+          icon: '⏳',
+          text: 'Recargando análisis...',
+          class: 'loading'
+        };
+      }
+
+      // Mostrar el número de intento si hay más de uno
       const attemptText = doc.analysisAttempts > 1 ? ` (Intento ${doc.analysisAttempts}/3)` : '';
+
+      // Si llevamos más de 10 segundos cargando, programar un reintento automático
+      if (doc.analysisLoadingStartTime && (Date.now() - doc.analysisLoadingStartTime > 10000) && !doc.autoRetryScheduled) {
+        doc.autoRetryScheduled = true;
+        console.log(`Programando reintento automático para documento ${doc._id}...`);
+        setTimeout(() => {
+          forceLoadAnalysis(doc._id);
+        }, 1000);
+      }
+
       return {
         icon: '⏳',
-        text: `Cargando...${attemptText}`,
+        text: `Cargando análisis${attemptText}`,
         class: 'loading'
       };
     }
@@ -717,6 +748,75 @@ const PDFAnalysis = () => {
     }
   };
 
+  // Función para corregir errores de análisis
+  const handleFixAnalysis = async (docId) => {
+    try {
+      // Buscar el documento en la lista
+      const docIndex = documents.findIndex(d => d._id === docId);
+      if (docIndex === -1) {
+        console.warn(`Documento ${docId} no encontrado en la lista actual`);
+        return;
+      }
+
+      // Mostrar indicador visual de que estamos corrigiendo
+      const updatedDocs = [...documents];
+      updatedDocs[docIndex] = {
+        ...updatedDocs[docIndex],
+        analysisLoaded: false,
+        analysisLoading: true,
+        analysisError: false,
+        analysisAttempts: 0,
+        geminiAnalysis: null,
+        fixingAnalysis: true // Indicador de corrección
+      };
+      setDocuments(updatedDocs);
+
+      // Mostrar mensaje de proceso
+      setUploadSuccess('Corrigiendo análisis del documento...');
+
+      // Llamar al servicio para corregir el análisis
+      const result = await fixDocumentAnalysis(docId);
+
+      if (result.success) {
+        // Actualizar el documento con el nuevo análisis
+        const fixedDocs = [...documents];
+        fixedDocs[docIndex] = {
+          ...fixedDocs[docIndex],
+          analysisLoaded: true,
+          analysisLoading: false,
+          analysisError: false,
+          geminiAnalysis: result.analysis,
+          fixingAnalysis: false,
+          status: 'completed' // Actualizar estado
+        };
+        setDocuments(fixedDocs);
+
+        // Mostrar mensaje de éxito
+        setUploadSuccess(`Análisis corregido exitosamente. Se encontraron ${result.elementsFound} elementos.`);
+        setTimeout(() => setUploadSuccess(''), 5000);
+      } else {
+        // Actualizar el documento con el error
+        const errorDocs = [...documents];
+        errorDocs[docIndex] = {
+          ...errorDocs[docIndex],
+          analysisLoaded: false,
+          analysisLoading: false,
+          analysisError: true,
+          fixingAnalysis: false
+        };
+        setDocuments(errorDocs);
+
+        // Mostrar mensaje de error
+        setError(`Error al corregir análisis: ${result.message}`);
+        setTimeout(() => setError(''), 5000);
+      }
+    } catch (error) {
+      console.error(`Error al corregir análisis para documento ${docId}:`, error);
+      setError(`Error al corregir análisis: ${error.message}`);
+      setTimeout(() => setError(''), 5000);
+    }
+  };
+
   // Función para forzar la carga del análisis
   const forceLoadAnalysis = async (docId) => {
     try {
@@ -727,24 +827,31 @@ const PDFAnalysis = () => {
         return;
       }
 
-      // Resetear el estado de análisis
+      // Mostrar indicador visual de que estamos recargando
       const updatedDocs = [...documents];
       updatedDocs[docIndex] = {
         ...updatedDocs[docIndex],
         analysisLoaded: false,
-        analysisLoading: false,
+        analysisLoading: true, // Mostrar que estamos cargando
         analysisError: false,
         analysisAttempts: 0,
-        geminiAnalysis: null
+        geminiAnalysis: null,
+        forceReloading: true // Indicador de recarga forzada
       };
       setDocuments(updatedDocs);
 
-      // Cargar el análisis inmediatamente
+      // Cargar el análisis inmediatamente con parámetro de forzar recarga
       setTimeout(() => {
-        loadDocumentAnalysis(docId);
+        loadDocumentAnalysis(docId, true); // Pasar true para forzar recarga
       }, 100);
+
+      // Mostrar mensaje de éxito temporal
+      setUploadSuccess('Recargando análisis del documento...');
+      setTimeout(() => setUploadSuccess(''), 3000);
     } catch (error) {
       console.error(`Error al forzar la carga del análisis para documento ${docId}:`, error);
+      setError(`Error al recargar el análisis: ${error.message}`);
+      setTimeout(() => setError(''), 3000);
     }
   };
 
@@ -893,7 +1000,7 @@ const PDFAnalysis = () => {
                                   <Spinner animation="border" size="sm" className="ms-1" style={{ width: '0.7rem', height: '0.7rem' }} />
                                 )}
                               </span>
-                              {(getCleaningStatus(doc).class === 'loading' || getCleaningStatus(doc).class === 'error' || getCleaningStatus(doc).class === 'unknown') && (
+                              {(getCleaningStatus(doc).class === 'loading' || getCleaningStatus(doc).class === 'unknown') && (
                                 <Button
                                   variant="link"
                                   size="sm"
@@ -908,6 +1015,36 @@ const PDFAnalysis = () => {
                                   <FaSync size="14" />
                                 </Button>
                               )}
+                              {getCleaningStatus(doc).class === 'error' && (
+                                <>
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="reload-btn ms-2 p-0"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      forceLoadAnalysis(doc._id);
+                                    }}
+                                    title="Forzar recarga del análisis"
+                                  >
+                                    <FaSync size="14" />
+                                  </Button>
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="fix-btn ms-2 p-0 text-warning"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleFixAnalysis(doc._id);
+                                    }}
+                                    title="Corregir análisis"
+                                  >
+                                    <FaServer size="14" />
+                                  </Button>
+                                </>
+                              )
                             </div>
                           </td>
                           <td>{new Date(doc.createdAt).toLocaleDateString()}</td>

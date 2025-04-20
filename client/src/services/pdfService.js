@@ -284,20 +284,25 @@ export const deleteDocument = async (id) => {
 /**
  * Analizar un PDF
  * @param {string} id - ID del documento
+ * @param {boolean} forceRefresh - Forzar recarga del análisis ignorando caché
  * @returns {Promise<Object>} - Resultado del análisis
  */
-export const analyzePDF = async (id) => {
+export const analyzePDF = async (id, forceRefresh = false) => {
   try {
-    console.log(`Analizando documento ${id}`);
+    console.log(`Analizando documento ${id}${forceRefresh ? ' (forzando recarga)' : ''}`);
 
     // Configurar un timeout para la solicitud
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos de timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 segundos de timeout (reducido)
+
+    // Preparar parámetros de consulta
+    const params = forceRefresh ? { refresh: 'true' } : {};
 
     // Realizar la solicitud con timeout
     const response = await API.post(`/pdf/analyze/${id}`, {}, {
       signal: controller.signal,
-      timeout: 30000, // 30 segundos de timeout adicional para axios
+      timeout: 20000, // 20 segundos de timeout adicional para axios (reducido)
+      params: params, // Añadir parámetros de consulta
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache',
@@ -392,6 +397,61 @@ export const analyzePDF = async (id) => {
       error: true,
       status: 'error',
       errorMessage: error.response ? error.response.data.error : error.message
+    };
+  }
+};
+
+/**
+ * Corregir errores de análisis en un documento
+ * @param {string} id - ID del documento
+ * @returns {Promise<Object>} - Resultado de la corrección
+ */
+export const fixDocumentAnalysis = async (id) => {
+  try {
+    console.log(`Corrigiendo análisis para documento ${id}`);
+
+    // Configurar un timeout para la solicitud
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos de timeout
+
+    // Realizar la solicitud con timeout
+    const response = await API.post(`/pdf/fix-analysis/${id}`, {}, {
+      signal: controller.signal,
+      timeout: 30000, // 30 segundos de timeout
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+
+    // Limpiar el timeout
+    clearTimeout(timeoutId);
+
+    console.log('Respuesta de corrección de análisis:', response);
+
+    if (response && response.data) {
+      return {
+        success: true,
+        analysis: response.data.analysis || 'Análisis corregido exitosamente',
+        message: response.data.message || 'Corrección completada',
+        elementsFound: response.data.elementsFound || 0,
+        summary: response.data.summary || {}
+      };
+    } else {
+      return {
+        success: false,
+        message: 'No se recibió respuesta válida del servidor'
+      };
+    }
+  } catch (error) {
+    console.error(`Error al corregir análisis para documento ${id}:`, error);
+
+    // Devolver un objeto de error formateado
+    return {
+      success: false,
+      error: true,
+      message: error.response ? error.response.data.error : error.message
     };
   }
 };
