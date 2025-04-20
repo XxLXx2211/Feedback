@@ -122,33 +122,29 @@ const PDFAnalysis = () => {
           return oldDoc && oldDoc.status !== 'completed' && newDoc.status === 'completed';
         });
 
-        // Cargar detalles completos para documentos completados
-        const enhancedDocuments = await Promise.all(
-          newDocuments.map(async (doc) => {
-            // Solo cargar detalles para documentos completados
-            if (doc.status === 'completed') {
-              try {
-                // Obtener análisis del documento
-                const analysisResponse = await analyzePDF(doc._id);
-                if (analysisResponse && analysisResponse.data && analysisResponse.data.analysis) {
-                  // Añadir el análisis de Gemini al documento
-                  return {
-                    ...doc,
-                    geminiAnalysis: analysisResponse.data.analysis
-                  };
-                }
-              } catch (error) {
-                console.error(`Error al cargar análisis para documento ${doc._id}:`, error);
-              }
-            }
-            return doc;
-          })
-        );
+        // Preparar los documentos para la actualización
+        const preparedDocuments = newDocuments.map(doc => ({
+          ...doc,
+          // Inicializar propiedades para el análisis
+          analysisLoaded: false,
+          analysisLoading: false,
+          geminiAnalysis: null
+        }));
 
-        // Actualizar la lista de documentos con los detalles completos
-        setDocuments(enhancedDocuments);
+        // Actualizar la lista de documentos
+        setDocuments(preparedDocuments);
 
-        // Si hay documentos recién completados, mostrar notificación y habilitar funcionalidades
+        // Cargar análisis para documentos completados (en segundo plano)
+        preparedDocuments.forEach(doc => {
+          if (doc.status === 'completed') {
+            // Cargar el análisis en segundo plano
+            setTimeout(() => {
+              loadDocumentAnalysis(doc._id);
+            }, 500);
+          }
+        });
+
+        // Si hay documentos recién completados, mostrar notificación
         if (newlyCompleted.length > 0) {
           console.log('Documentos recién procesados:', newlyCompleted.map(doc => doc.title));
           // Mostrar notificación
@@ -400,6 +396,43 @@ const PDFAnalysis = () => {
     }
   };
 
+  // Función para cargar el análisis de un documento
+  const loadDocumentAnalysis = async (docId) => {
+    try {
+      console.log(`Cargando análisis para documento ${docId}...`);
+      const response = await analyzePDF(docId);
+
+      // Verificar si la respuesta contiene el análisis
+      if (response && response.analysis) {
+        // Buscar el documento en la lista
+        const docIndex = documents.findIndex(d => d._id === docId);
+        if (docIndex !== -1) {
+          // Crear una copia del documento
+          const updatedDoc = { ...documents[docIndex] };
+
+          // Actualizar el documento con el análisis
+          updatedDoc.geminiAnalysis = response.analysis;
+          updatedDoc.analysisLoaded = true;
+          updatedDoc.analysisLoading = false;
+
+          // Crear una copia de la lista de documentos
+          const updatedDocs = [...documents];
+          updatedDocs[docIndex] = updatedDoc;
+
+          // Actualizar el estado
+          setDocuments(updatedDocs);
+
+          console.log(`Análisis cargado para documento ${docId}`);
+          return response.analysis;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error(`Error al cargar análisis para documento ${docId}:`, error);
+      return null;
+    }
+  };
+
   // Función para determinar el estado de limpieza basado en los resultados del análisis
   const getCleaningStatus = (doc) => {
     // Si el documento no está procesado o tiene error, devolver un estado de procesamiento
@@ -420,36 +453,17 @@ const PDFAnalysis = () => {
       };
     }
 
-    // Verificar si necesitamos cargar el análisis
-    if (!doc.analysisLoaded && !doc.analysisLoading) {
+    // Si el documento está completado pero no tiene análisis cargado
+    if (!doc.geminiAnalysis && !doc.analysisLoading) {
       // Marcar que estamos cargando el análisis
       doc.analysisLoading = true;
 
-      // Cargar el análisis de forma asíncrona
-      const loadAnalysis = async () => {
-        try {
-          console.log(`Cargando análisis para documento ${doc._id}...`);
-          const response = await analyzePDF(doc._id);
+      // Cargar el análisis (sin esperar)
+      setTimeout(() => {
+        loadDocumentAnalysis(doc._id);
+      }, 100);
 
-          if (response && response.analysis) {
-            // Guardar el análisis en el documento
-            doc.geminiAnalysis = response.analysis;
-            doc.analysisLoaded = true;
-            doc.analysisLoading = false;
-
-            // Forzar una actualización de la interfaz
-            setDocuments([...documents]);
-          }
-        } catch (error) {
-          console.error('Error al cargar análisis:', error);
-          doc.analysisLoading = false;
-        }
-      };
-
-      // Ejecutar la carga del análisis
-      loadAnalysis();
-
-      // Mientras se carga, mostrar un estado de carga
+      // Mientras tanto, mostrar estado de carga
       return {
         icon: '⏳',
         text: 'Cargando...',
@@ -457,7 +471,7 @@ const PDFAnalysis = () => {
       };
     }
 
-    // Si el análisis está cargando, mostrar un estado de carga
+    // Si el análisis está cargando, mostrar estado de carga
     if (doc.analysisLoading) {
       return {
         icon: '⏳',
