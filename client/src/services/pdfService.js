@@ -216,29 +216,70 @@ export const deleteDocument = async (id) => {
 export const analyzePDF = async (id) => {
   try {
     console.log(`Analizando documento ${id}`);
-    const response = await API.post(`/pdf/analyze/${id}`);
+
+    // Configurar un timeout para la solicitud
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
+
+    // Realizar la solicitud con timeout
+    const response = await API.post(`/pdf/analyze/${id}`, {}, {
+      signal: controller.signal,
+      timeout: 15000 // 15 segundos de timeout adicional para axios
+    });
+
+    // Limpiar el timeout
+    clearTimeout(timeoutId);
+
     console.log('Respuesta del servidor (análisis):', response);
 
     // Verificar la estructura de la respuesta y normalizarla
     if (response && response.data) {
-      // Si la respuesta tiene la estructura esperada, devolverla directamente
-      return response.data;
+      // Si la respuesta tiene la estructura esperada
+      if (response.data.analysis) {
+        return {
+          analysis: response.data.analysis,
+          formattedAnalysis: response.data.formattedAnalysis || true
+        };
+      } else if (typeof response.data === 'string') {
+        // Si la respuesta es un string, usarlo como análisis
+        return {
+          analysis: response.data,
+          formattedAnalysis: true
+        };
+      } else {
+        // Devolver la respuesta completa
+        return response.data;
+      }
     } else if (response && response.analysis) {
-      // Si la respuesta tiene el análisis directamente, devolverla
+      // Si la respuesta tiene el análisis directamente
       return response;
     } else {
       // Si la respuesta no tiene la estructura esperada, crear una estructura compatible
+      console.warn('Respuesta sin estructura esperada:', response);
       return {
         analysis: 'No se pudo obtener el análisis del documento.',
-        formattedAnalysis: true
+        formattedAnalysis: true,
+        status: 'error'
       };
     }
   } catch (error) {
+    // Manejar errores de timeout
+    if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+      console.error(`Timeout al analizar documento ${id}`);
+      return {
+        analysis: 'El servidor tardó demasiado en responder. El documento puede estar en proceso de análisis.',
+        error: true,
+        status: 'timeout',
+        errorMessage: 'Timeout de la solicitud'
+      };
+    }
+
     console.error(`Error al analizar documento ${id}:`, error.response ? error.response.data : error.message);
     // Devolver un objeto de error formateado para que la interfaz pueda manejarlo
     return {
       analysis: 'Error al analizar el documento. Por favor, intenta de nuevo más tarde.',
       error: true,
+      status: 'error',
       errorMessage: error.response ? error.response.data.error : error.message
     };
   }

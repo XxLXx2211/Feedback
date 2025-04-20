@@ -444,57 +444,112 @@ const PDFAnalysis = () => {
         return documents[docIndex].geminiAnalysis;
       }
 
+      // Verificar si el documento ya ha tenido demasiados intentos
+      if (documents[docIndex].analysisAttempts && documents[docIndex].analysisAttempts >= 3) {
+        console.warn(`Demasiados intentos para cargar análisis del documento ${docId}`);
+
+        // Marcar como cargado con error
+        const updatedDocs = [...documents];
+        updatedDocs[docIndex] = {
+          ...updatedDocs[docIndex],
+          analysisLoaded: true,
+          analysisLoading: false,
+          analysisError: true,
+          geminiAnalysis: 'No se pudo cargar el análisis después de varios intentos.'
+        };
+        setDocuments(updatedDocs);
+        return null;
+      }
+
       // Marcar el documento como cargando (para evitar múltiples solicitudes)
       const updatingDocs = [...documents];
       updatingDocs[docIndex] = {
         ...updatingDocs[docIndex],
-        analysisLoading: true
+        analysisLoading: true,
+        analysisAttempts: (updatingDocs[docIndex].analysisAttempts || 0) + 1
       };
       setDocuments(updatingDocs);
 
-      // Solicitar el análisis al servidor
-      const response = await analyzePDF(docId);
+      // Configurar un timeout para la carga del análisis
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout')), 20000); // 20 segundos de timeout
+      });
+
+      // Solicitar el análisis al servidor con timeout
+      const analysisPromise = analyzePDF(docId);
+      const response = await Promise.race([analysisPromise, timeoutPromise])
+        .catch(error => {
+          console.error(`Error o timeout al cargar análisis para documento ${docId}:`, error);
+          return {
+            error: true,
+            status: error.message === 'Timeout' ? 'timeout' : 'error',
+            analysis: `Error al cargar análisis: ${error.message}`
+          };
+        });
+
       console.log(`Respuesta de análisis para documento ${docId}:`, response);
 
-      // Verificar si la respuesta contiene el análisis
-      if (response && response.analysis) {
-        // Obtener la lista actualizada de documentos (puede haber cambiado mientras se cargaba)
-        const currentDocIndex = documents.findIndex(d => d._id === docId);
-        if (currentDocIndex !== -1) {
-          // Crear una copia de la lista actual de documentos
-          const updatedDocs = [...documents];
+      // Obtener el índice actualizado del documento
+      const currentDocIndex = documents.findIndex(d => d._id === docId);
+      if (currentDocIndex === -1) {
+        console.warn(`Documento ${docId} ya no existe en la lista`);
+        return null;
+      }
 
-          // Actualizar el documento con el análisis
+      // Crear una copia de la lista actual de documentos
+      const updatedDocs = [...documents];
+
+      // Verificar si la respuesta contiene el análisis
+      if (response && response.analysis && !response.error) {
+        // Actualizar el documento con el análisis exitoso
+        updatedDocs[currentDocIndex] = {
+          ...updatedDocs[currentDocIndex],
+          geminiAnalysis: response.analysis,
+          analysisLoaded: true,
+          analysisLoading: false,
+          analysisError: false
+        };
+
+        // Actualizar el estado
+        setDocuments(updatedDocs);
+        console.log(`Análisis cargado correctamente para documento ${docId}`);
+        return response.analysis;
+      } else {
+        // Manejar errores o respuestas sin análisis
+        const errorMessage = response.error ?
+          response.analysis || 'Error al cargar el análisis.' :
+          'No se encontró análisis para este documento.';
+
+        // Si es un timeout, programar un nuevo intento
+        if (response.status === 'timeout' && (updatedDocs[currentDocIndex].analysisAttempts || 0) < 3) {
           updatedDocs[currentDocIndex] = {
             ...updatedDocs[currentDocIndex],
-            geminiAnalysis: response.analysis,
-            analysisLoaded: true,
             analysisLoading: false
           };
-
-          // Actualizar el estado
           setDocuments(updatedDocs);
 
-          console.log(`Análisis cargado correctamente para documento ${docId}`);
-          return response.analysis;
+          // Programar un nuevo intento después de 5 segundos
+          console.log(`Programando nuevo intento para documento ${docId}...`);
+          setTimeout(() => {
+            loadDocumentAnalysis(docId);
+          }, 5000);
+
+          return null;
         }
-      } else {
-        // Si no hay análisis en la respuesta, marcar como cargado pero sin datos
-        const currentDocIndex = documents.findIndex(d => d._id === docId);
-        if (currentDocIndex !== -1) {
-          const updatedDocs = [...documents];
-          updatedDocs[currentDocIndex] = {
-            ...updatedDocs[currentDocIndex],
-            analysisLoaded: true,
-            analysisLoading: false,
-            geminiAnalysis: 'No se encontró análisis para este documento.'
-          };
-          setDocuments(updatedDocs);
-        }
+
+        // Si no es timeout o ya se han agotado los intentos, marcar como error
+        updatedDocs[currentDocIndex] = {
+          ...updatedDocs[currentDocIndex],
+          analysisLoaded: true,
+          analysisLoading: false,
+          analysisError: true,
+          geminiAnalysis: errorMessage
+        };
+        setDocuments(updatedDocs);
       }
       return null;
     } catch (error) {
-      console.error(`Error al cargar análisis para documento ${docId}:`, error);
+      console.error(`Error inesperado al cargar análisis para documento ${docId}:`, error);
 
       // Marcar el documento como no cargando en caso de error
       const docIndex = documents.findIndex(d => d._id === docId);
@@ -502,7 +557,8 @@ const PDFAnalysis = () => {
         const updatedDocs = [...documents];
         updatedDocs[docIndex] = {
           ...updatedDocs[docIndex],
-          analysisLoading: false
+          analysisLoading: false,
+          analysisError: true
         };
         setDocuments(updatedDocs);
       }
@@ -513,8 +569,17 @@ const PDFAnalysis = () => {
 
   // Función para determinar el estado de limpieza basado en los resultados del análisis
   const getCleaningStatus = (doc) => {
-    // Si el documento no está procesado o tiene error, devolver un estado de procesamiento
-    if (!doc || doc.status !== 'completed') {
+    // Si el documento no existe, devolver un estado de error
+    if (!doc) {
+      return {
+        icon: '❌',
+        text: 'Error',
+        class: 'error'
+      };
+    }
+
+    // Si el documento no está procesado, devolver un estado de procesamiento
+    if (doc.status !== 'completed') {
       return {
         icon: '⏳',
         text: 'Procesando...',
@@ -531,10 +596,24 @@ const PDFAnalysis = () => {
       };
     }
 
+    // Si el documento tiene error de análisis, mostrar error
+    if (doc.analysisError) {
+      return {
+        icon: '⚠️',
+        text: 'Error de análisis',
+        class: 'error'
+      };
+    }
+
     // Si el documento está completado pero no tiene análisis cargado
     if (!doc.geminiAnalysis && !doc.analysisLoading) {
       // Marcar que estamos cargando el análisis
       doc.analysisLoading = true;
+
+      // Inicializar contador de intentos si no existe
+      if (!doc.analysisAttempts) {
+        doc.analysisAttempts = 0;
+      }
 
       // Cargar el análisis (sin esperar)
       setTimeout(() => {
@@ -549,11 +628,12 @@ const PDFAnalysis = () => {
       };
     }
 
-    // Si el análisis está cargando, mostrar estado de carga
+    // Si el análisis está cargando, mostrar estado de carga con el número de intento
     if (doc.analysisLoading) {
+      const attemptText = doc.analysisAttempts > 1 ? ` (Intento ${doc.analysisAttempts}/3)` : '';
       return {
         icon: '⏳',
-        text: 'Cargando...',
+        text: `Cargando...${attemptText}`,
         class: 'loading'
       };
     }
