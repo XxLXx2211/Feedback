@@ -4,7 +4,7 @@ services:
     name: sermalite-feedback-api
     env: node
     plan: free
-    buildCommand: cd server && npm install
+    buildCommand: cd server && npm install --production
     startCommand: cd server && node scripts/createIndexes.js && node app.js
     healthCheckPath: /api/status
     envVars:
