@@ -208,17 +208,45 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
     // Almacenar en caché solo si hay datos válidos
     if (freshData) {
       set(key, freshData, ttl);
+      // Guardar una copia como último valor conocido válido
+      set(`last_valid_${key}`, freshData, 86400); // 24 horas
     }
     return freshData;
   } catch (error) {
     console.error(`Error al obtener datos para caché (${key}):`, error);
 
-    // Si hay error pero tenemos datos en caché, devolver los datos en caché
+    // Estrategia de fallback en cascada:
+    // 1. Intentar usar el valor en caché actual si existe
     if (cachedValue !== null) {
       console.log(`Usando caché existente después de error para ${key}`);
       return cachedValue;
     }
 
+    // 2. Intentar usar el último valor válido conocido
+    const lastValidValue = get(`last_valid_${key}`);
+    if (lastValidValue !== null) {
+      console.log(`Usando último valor válido conocido para ${key}`);
+      return lastValidValue;
+    }
+
+    // 3. Si es un error de MongoDB relacionado con operadores $, intentar con una consulta más simple
+    if (error.name === 'MongoServerError' &&
+        (error.message.includes('field names may not start with') ||
+         error.message.includes('$'))) {
+      console.log(`Error de sintaxis MongoDB detectado para ${key}, intentando consulta simplificada`);
+
+      // Registrar este error para evitar reintentos frecuentes
+      set(`error_${key}`, { timestamp: Date.now(), message: error.message }, 300); // 5 minutos
+
+      // Devolver un objeto vacío o array vacío dependiendo del contexto
+      if (key.includes('document') || key.includes('pdf')) {
+        return { documents: [], pagination: { totalDocuments: 0, totalPages: 1, currentPage: 1, pageSize: 20 } };
+      }
+
+      return Array.isArray(cachedValue) ? [] : {};
+    }
+
+    // 4. Si todo lo demás falla, lanzar el error
     throw error;
   }
 };

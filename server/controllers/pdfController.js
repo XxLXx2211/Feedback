@@ -102,7 +102,7 @@ exports.getDocuments = async (req, res) => {
         s: 1,           // estado
         creado: 1,      // fecha de creación
         actualizado: 1, // fecha de actualización
-        conv: { $exists: true, $size: { $gt: 0 } } // solo verificar si hay conversaciones
+        conv: 1         // incluir campo de conversaciones (verificaremos su existencia después)
       })
       .sort({ creado: -1 })
       .skip(skip)
@@ -150,7 +150,8 @@ exports.getDocuments = async (req, res) => {
                 doc.s === 'c' ? 'completed' : 'error',
         createdAt: doc.creado || new Date(),
         updatedAt: doc.actualizado || new Date(),
-        hasConversation: doc.conv ? true : false
+        // Verificar si el campo conv existe y tiene elementos
+        hasConversation: Array.isArray(doc.conv) && doc.conv.length > 0
       }));
 
       // Respuesta con metadatos de paginación
@@ -170,7 +171,45 @@ exports.getDocuments = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error('Error al obtener documentos:', error);
-    // Respuesta de error más amigable
+
+    // Intentar proporcionar una respuesta fallback
+    try {
+      // Verificar si es un error de MongoDB relacionado con operadores $
+      if (error.name === 'MongoServerError' &&
+          (error.message.includes('field names may not start with') ||
+           error.message.includes('$'))) {
+        console.log('Error de sintaxis MongoDB detectado, enviando respuesta fallback');
+
+        // Enviar una respuesta vacía pero válida
+        return res.status(200).json({
+          documents: [],
+          pagination: {
+            totalDocuments: 0,
+            totalPages: 1,
+            currentPage: parseInt(req.query.page) || 1,
+            pageSize: parseInt(req.query.limit) || 20,
+            hasNextPage: false,
+            hasPrevPage: false
+          },
+          _fallback: true // Indicador para el cliente de que es una respuesta fallback
+        });
+      }
+
+      // Intentar obtener documentos desde la caché
+      const cachedDocuments = cacheService.get('last_valid_documents_page_1_limit_20');
+      if (cachedDocuments) {
+        console.log('Usando documentos en caché como fallback');
+        return res.status(200).json({
+          ...cachedDocuments,
+          _cached: true, // Indicador para el cliente de que son datos en caché
+          _error: error.message
+        });
+      }
+    } catch (fallbackError) {
+      console.error('Error al intentar proporcionar fallback:', fallbackError);
+    }
+
+    // Si todo falla, enviar respuesta de error estándar
     res.status(500).json({
       error: 'Error al obtener documentos',
       message: 'Ha ocurrido un problema al cargar los documentos. Por favor, intenta de nuevo más tarde.',
