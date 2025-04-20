@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Form, Alert, Table, Spinner, Modal, Button } from 'react-bootstrap';
-import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaSearchPlus, FaPaperPlane, FaServer } from 'react-icons/fa';
+import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaSearchPlus, FaPaperPlane, FaServer, FaSync } from 'react-icons/fa';
 import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF } from '../services/pdfService';
 import './PDFAnalysis.css';
 
@@ -717,6 +717,37 @@ const PDFAnalysis = () => {
     }
   };
 
+  // Función para forzar la carga del análisis
+  const forceLoadAnalysis = async (docId) => {
+    try {
+      // Buscar el documento en la lista
+      const docIndex = documents.findIndex(d => d._id === docId);
+      if (docIndex === -1) {
+        console.warn(`Documento ${docId} no encontrado en la lista actual`);
+        return;
+      }
+
+      // Resetear el estado de análisis
+      const updatedDocs = [...documents];
+      updatedDocs[docIndex] = {
+        ...updatedDocs[docIndex],
+        analysisLoaded: false,
+        analysisLoading: false,
+        analysisError: false,
+        analysisAttempts: 0,
+        geminiAnalysis: null
+      };
+      setDocuments(updatedDocs);
+
+      // Cargar el análisis inmediatamente
+      setTimeout(() => {
+        loadDocumentAnalysis(docId);
+      }, 100);
+    } catch (error) {
+      console.error(`Error al forzar la carga del análisis para documento ${docId}:`, error);
+    }
+  };
+
   // Manejar eliminación de documento
   const handleDeleteDocument = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar este documento? Esta acción no se puede deshacer.')) {
@@ -854,13 +885,30 @@ const PDFAnalysis = () => {
                         <tr key={doc._id}>
                           <td>{doc.title}</td>
                           <td>
-                            <span className={`cleaning-status ${getCleaningStatus(doc).class}`}>
-                              <span className="status-icon">{getCleaningStatus(doc).icon}</span>
-                              <span className="status-text">{getCleaningStatus(doc).text}</span>
-                              {doc.status !== 'completed' && doc.status !== 'error' && (
-                                <Spinner animation="border" size="sm" className="ms-1" style={{ width: '0.7rem', height: '0.7rem' }} />
+                            <div className="cleaning-status-container d-flex align-items-center">
+                              <span className={`cleaning-status ${getCleaningStatus(doc).class}`}>
+                                <span className="status-icon">{getCleaningStatus(doc).icon}</span>
+                                <span className="status-text">{getCleaningStatus(doc).text}</span>
+                                {doc.status !== 'completed' && doc.status !== 'error' && (
+                                  <Spinner animation="border" size="sm" className="ms-1" style={{ width: '0.7rem', height: '0.7rem' }} />
+                                )}
+                              </span>
+                              {(getCleaningStatus(doc).class === 'loading' || getCleaningStatus(doc).class === 'error' || getCleaningStatus(doc).class === 'unknown') && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="reload-btn ms-2 p-0"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    forceLoadAnalysis(doc._id);
+                                  }}
+                                  title="Forzar recarga del análisis"
+                                >
+                                  <FaSync size="14" />
+                                </Button>
                               )}
-                            </span>
+                            </div>
                           </td>
                           <td>{new Date(doc.createdAt).toLocaleDateString()}</td>
                           <td>

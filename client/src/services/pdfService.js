@@ -219,12 +219,17 @@ export const analyzePDF = async (id) => {
 
     // Configurar un timeout para la solicitud
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos de timeout
 
     // Realizar la solicitud con timeout
     const response = await API.post(`/pdf/analyze/${id}`, {}, {
       signal: controller.signal,
-      timeout: 15000 // 15 segundos de timeout adicional para axios
+      timeout: 30000, // 30 segundos de timeout adicional para axios
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
 
     // Limpiar el timeout
@@ -238,21 +243,43 @@ export const analyzePDF = async (id) => {
       if (response.data.analysis) {
         return {
           analysis: response.data.analysis,
-          formattedAnalysis: response.data.formattedAnalysis || true
+          formattedAnalysis: response.data.formattedAnalysis || true,
+          status: 'success'
+        };
+      } else if (response.data.g) {
+        // Si la respuesta tiene el campo g (geminiAnalysis)
+        return {
+          analysis: response.data.g,
+          formattedAnalysis: true,
+          status: 'success'
         };
       } else if (typeof response.data === 'string') {
         // Si la respuesta es un string, usarlo como análisis
         return {
           analysis: response.data,
+          formattedAnalysis: true,
+          status: 'success'
+        };
+      } else if (response.data.status === 'processing') {
+        // Si el documento está en proceso
+        return {
+          analysis: 'El documento está siendo procesado. Por favor, intenta de nuevo en unos momentos.',
+          status: 'processing',
           formattedAnalysis: true
         };
       } else {
         // Devolver la respuesta completa
-        return response.data;
+        return {
+          ...response.data,
+          status: response.data.status || 'unknown'
+        };
       }
     } else if (response && response.analysis) {
       // Si la respuesta tiene el análisis directamente
-      return response;
+      return {
+        ...response,
+        status: 'success'
+      };
     } else {
       // Si la respuesta no tiene la estructura esperada, crear una estructura compatible
       console.warn('Respuesta sin estructura esperada:', response);
@@ -271,6 +298,17 @@ export const analyzePDF = async (id) => {
         error: true,
         status: 'timeout',
         errorMessage: 'Timeout de la solicitud'
+      };
+    }
+
+    // Manejar errores de red
+    if (error.message && error.message.includes('Network Error')) {
+      console.error(`Error de red al analizar documento ${id}`);
+      return {
+        analysis: 'Error de conexión con el servidor. Por favor, verifica tu conexión a internet.',
+        error: true,
+        status: 'network_error',
+        errorMessage: 'Error de conexión'
       };
     }
 
