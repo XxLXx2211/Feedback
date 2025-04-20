@@ -47,20 +47,31 @@ async function getSystemInfo() {
       const totalMemory = os.totalmem();
       const freeMemory = os.freemem();
       const memoryUsage = process.memoryUsage();
-      
+
       // Información de MongoDB
-      const PDFDocument = await getPDFDocumentModel();
-      
-      // Contar documentos por estado (usando caché para consultas frecuentes)
-      const documentCounts = await cacheService.getOrSet('document_counts', async () => {
-        const processing = await PDFDocument.countDocuments({ s: 'p' });
-        const completed = await PDFDocument.countDocuments({ s: 'c' });
-        const error = await PDFDocument.countDocuments({ s: 'e' });
-        const total = await PDFDocument.estimatedDocumentCount();
-        
-        return { processing, completed, error, total };
-      }, 60); // Caché de 60 segundos
-      
+      let documentCounts = { processing: 0, completed: 0, error: 0, total: 0 };
+
+      try {
+        // Contar documentos por estado (usando caché para consultas frecuentes)
+        documentCounts = await cacheService.getOrSet('document_counts', async () => {
+          try {
+            const PDFDocument = await getPDFDocumentModel();
+            const processing = await PDFDocument.countDocuments({ s: 'p' });
+            const completed = await PDFDocument.countDocuments({ s: 'c' });
+            const error = await PDFDocument.countDocuments({ s: 'e' });
+            const total = await PDFDocument.estimatedDocumentCount();
+
+            return { processing, completed, error, total };
+          } catch (dbError) {
+            console.error('Error al obtener conteo de documentos:', dbError);
+            return { processing: 0, completed: 0, error: 0, total: 0 };
+          }
+        }, 60); // Caché de 60 segundos
+      } catch (cacheError) {
+        console.error('Error al usar caché para conteo de documentos:', cacheError);
+        // Continuar con valores predeterminados
+      }
+
       // Información de conexiones a MongoDB
       const mongoStats = {
         connections: mongoose.connections.length,
@@ -71,10 +82,10 @@ async function getSystemInfo() {
                 mongoose.connection.readyState === 2 ? 'conectando' :
                 mongoose.connection.readyState === 3 ? 'desconectando' : 'desconocido'
       };
-      
+
       // Estadísticas de caché
       const cacheStats = cacheService.getStats();
-      
+
       return {
         system: {
           platform: os.platform(),
@@ -105,15 +116,15 @@ async function getSystemInfo() {
             total: systemStats.requestsTotal,
             success: systemStats.requestsSuccess,
             error: systemStats.requestsError,
-            successRate: systemStats.requestsTotal > 0 
-              ? ((systemStats.requestsSuccess / systemStats.requestsTotal) * 100).toFixed(2) 
+            successRate: systemStats.requestsTotal > 0
+              ? ((systemStats.requestsSuccess / systemStats.requestsTotal) * 100).toFixed(2)
               : 100
           },
           pdfs: {
             processed: systemStats.pdfsProcessed,
             error: systemStats.pdfsError,
-            successRate: (systemStats.pdfsProcessed + systemStats.pdfsError) > 0 
-              ? ((systemStats.pdfsProcessed / (systemStats.pdfsProcessed + systemStats.pdfsError)) * 100).toFixed(2) 
+            successRate: (systemStats.pdfsProcessed + systemStats.pdfsError) > 0
+              ? ((systemStats.pdfsProcessed / (systemStats.pdfsProcessed + systemStats.pdfsError)) * 100).toFixed(2)
               : 100
           }
         },
@@ -144,19 +155,25 @@ async function isSystemOverloaded() {
       const loadAvg = os.loadavg()[0]; // Carga promedio de 1 minuto
       const cpuCount = os.cpus().length;
       const normalizedLoad = loadAvg / cpuCount;
-      
+
       // Verificar memoria
       const totalMemory = os.totalmem();
       const freeMemory = os.freemem();
       const memoryUsage = 1 - (freeMemory / totalMemory);
-      
+
       // Verificar documentos en procesamiento
-      const PDFDocument = await getPDFDocumentModel();
-      const processingCount = await PDFDocument.countDocuments({ s: 'p' });
-      
+      let processingCount = 0;
+      try {
+        const PDFDocument = await getPDFDocumentModel();
+        processingCount = await PDFDocument.countDocuments({ s: 'p' });
+      } catch (dbError) {
+        console.error('Error al obtener documentos en procesamiento:', dbError);
+        // Continuar con processingCount = 0
+      }
+
       // Determinar si el sistema está sobrecargado
       const isOverloaded = normalizedLoad > 0.8 || memoryUsage > 0.85 || processingCount > 20;
-      
+
       return {
         isOverloaded,
         factors: {

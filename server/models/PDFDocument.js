@@ -82,12 +82,34 @@ const initModel = async () => {
     return PDFDocument;
   } catch (error) {
     console.error('Error al inicializar modelo PDFDocument:', error);
-    throw error;
+    // En caso de error, devolver un modelo simulado para evitar errores en cascada
+    return {
+      find: () => ({ exec: () => Promise.resolve([]) }),
+      findById: () => Promise.resolve(null),
+      countDocuments: () => Promise.resolve(0),
+      estimatedDocumentCount: () => Promise.resolve(0)
+    };
+  }
+};
+
+// Función para obtener el modelo PDFDocument
+const getPDFDocumentModel = async () => {
+  try {
+    return await initModel();
+  } catch (error) {
+    console.error('Error al obtener modelo PDFDocument:', error);
+    // En caso de error, devolver un modelo simulado para evitar errores en cascada
+    return {
+      find: () => ({ exec: () => Promise.resolve([]) }),
+      findById: () => Promise.resolve(null),
+      countDocuments: () => Promise.resolve(0),
+      estimatedDocumentCount: () => Promise.resolve(0)
+    };
   }
 };
 
 // No inicializar el modelo automáticamente
 // Esto evita que se cree una instancia del modelo antes de que se establezca la conexión
-// El modelo se inicializará cuando se llame a initModel() desde el controlador
+// El modelo se inicializará cuando se llame a getPDFDocumentModel() o initModel() desde el controlador
 
-module.exports = { pdfDocumentSchema, initModel };
+module.exports = { pdfDocumentSchema, initModel, getPDFDocumentModel };

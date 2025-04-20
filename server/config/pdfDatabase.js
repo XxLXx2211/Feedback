@@ -57,9 +57,6 @@ const connectPDFDatabase = async () => {
       w: 'majority',
       keepAlive: true, // Mantener conexiones activas
       autoIndex: false, // Desactivar creación automática de índices (los creamos manualmente)
-      bufferMaxEntries: 0, // Desactivar buffer de comandos cuando se desconecta
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       readPreference: 'secondaryPreferred', // Preferir lecturas de nodos secundarios para mejor rendimiento
       writeConcern: { w: 'majority', wtimeout: 10000 } // Asegurar que las escrituras se confirmen en la mayoría de nodos
     };
@@ -102,9 +99,6 @@ const connectPDFDatabase = async () => {
                   w: 'majority',
                   keepAlive: true,
                   autoIndex: false,
-                  bufferMaxEntries: 0,
-                  useNewUrlParser: true,
-                  useUnifiedTopology: true,
                   readPreference: 'secondaryPreferred',
                   writeConcern: { w: 'majority', wtimeout: 10000 }
                 };
