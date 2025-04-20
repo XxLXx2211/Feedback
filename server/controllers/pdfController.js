@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { analyzePDF } = require('../services/pdfService');
 const { analyzeWithGemini, generateChatResponse } = require('../services/aiService');
+const cacheService = require('../services/cacheService');
 
 // Importar modelo para documentos PDF
 const { initModel } = require('../models/PDFDocument');
@@ -74,63 +75,99 @@ exports.uploadPDF = async (req, res) => {
 };
 
 /**
- * Obtener todos los documentos con paginación y caché
+ * Obtener todos los documentos con paginación, caché y throttling
  */
 exports.getDocuments = async (req, res) => {
   try {
     // Parámetros de paginación
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
 
-    // Obtener el modelo PDFDocument
-    const PDFDocument = await getPDFDocumentModel();
+    // Generar clave de caché basada en los parámetros de paginación
+    const cacheKey = `documents_page_${page}_limit_${limit}`;
 
-    // Buscar documentos con paginación y proyección (solo campos necesarios)
-    // Esto reduce significativamente el tamaño de la respuesta y mejora el rendimiento
-    const documents = await PDFDocument.find({}, {
-      t: 1,           // título
-      d: 1,           // descripción
-      f: 1,           // nombre de archivo
-      s: 1,           // estado
-      creado: 1,      // fecha de creación
-      actualizado: 1, // fecha de actualización
-      conv: { $exists: true, $size: { $gt: 0 } } // solo verificar si hay conversaciones
-    })
-    .sort({ creado: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean(); // Usar lean() para obtener objetos JavaScript simples (más rápido)
+    // Usar caché con throttling para reducir consultas frecuentes
+    const result = await cacheService.getOrSet(cacheKey, async () => {
+      const skip = (page - 1) * limit;
 
-    // Contar total de documentos (para paginación)
-    const totalDocuments = await PDFDocument.countDocuments();
-    const totalPages = Math.ceil(totalDocuments / limit);
+      // Obtener el modelo PDFDocument
+      const PDFDocument = await getPDFDocumentModel();
 
-    // Transformar para mantener compatibilidad con el frontend
-    const transformedDocuments = documents.map(doc => ({
-      _id: doc._id,
-      title: doc.t || 'Sin título',
-      description: doc.d || '',
-      filename: doc.f || 'documento.pdf',
-      status: doc.s === 'p' ? 'pending' :
-              doc.s === 'c' ? 'completed' : 'error',
-      createdAt: doc.creado || new Date(),
-      updatedAt: doc.actualizado || new Date(),
-      hasConversation: doc.conv ? true : false
-    }));
+      // Buscar documentos con paginación y proyección (solo campos necesarios)
+      // Esto reduce significativamente el tamaño de la respuesta y mejora el rendimiento
+      const documents = await PDFDocument.find({}, {
+        t: 1,           // título
+        d: 1,           // descripción
+        f: 1,           // nombre de archivo
+        s: 1,           // estado
+        creado: 1,      // fecha de creación
+        actualizado: 1, // fecha de actualización
+        conv: { $exists: true, $size: { $gt: 0 } } // solo verificar si hay conversaciones
+      })
+      .sort({ creado: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(); // Usar lean() para obtener objetos JavaScript simples (más rápido)
 
-    // Respuesta con metadatos de paginación
-    res.status(200).json({
-      documents: transformedDocuments,
-      pagination: {
-        totalDocuments,
-        totalPages,
-        currentPage: page,
-        pageSize: limit,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
+      // Contar total de documentos (para paginación)
+      // Usar caché para el conteo total, que es costoso
+      let totalDocuments = 0;
+      try {
+        // Intentar obtener el conteo desde la caché de document_counts
+        const cachedCounts = cacheService.get('document_counts') || cacheService.get('last_document_counts');
+        if (cachedCounts && typeof cachedCounts.total === 'number') {
+          totalDocuments = cachedCounts.total;
+          console.log('Usando conteo en caché para paginación:', totalDocuments);
+        } else {
+          // Si no está en caché, verificar si debemos throttlear
+          if (cacheService.shouldThrottle('documents_count', 10000)) {
+            // Estimar basado en los documentos actuales y la página
+            totalDocuments = Math.max(documents.length + (page - 1) * limit, 0);
+            console.log('Conteo throttled, usando estimación:', totalDocuments);
+          } else {
+            // Realizar la consulta a la base de datos
+            console.log('Realizando conteo total de documentos');
+            totalDocuments = await PDFDocument.estimatedDocumentCount();
+            // Guardar para uso futuro
+            cacheService.set('documents_total_count', totalDocuments, 300); // 5 minutos
+          }
+        }
+      } catch (countError) {
+        console.error('Error al contar documentos:', countError);
+        // Estimar basado en los documentos actuales
+        totalDocuments = Math.max(documents.length + (page - 1) * limit, 0);
       }
-    });
+
+      const totalPages = Math.ceil(totalDocuments / limit);
+
+      // Transformar para mantener compatibilidad con el frontend
+      const transformedDocuments = documents.map(doc => ({
+        _id: doc._id,
+        title: doc.t || 'Sin título',
+        description: doc.d || '',
+        filename: doc.f || 'documento.pdf',
+        status: doc.s === 'p' ? 'pending' :
+                doc.s === 'c' ? 'completed' : 'error',
+        createdAt: doc.creado || new Date(),
+        updatedAt: doc.actualizado || new Date(),
+        hasConversation: doc.conv ? true : false
+      }));
+
+      // Respuesta con metadatos de paginación
+      return {
+        documents: transformedDocuments,
+        pagination: {
+          totalDocuments,
+          totalPages,
+          currentPage: page,
+          pageSize: limit,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
+        }
+      };
+    }, 30, { minInterval: 2000 }); // Caché de 30 segundos, mínimo 2 segundos entre consultas
+
+    res.status(200).json(result);
   } catch (error) {
     console.error('Error al obtener documentos:', error);
     // Respuesta de error más amigable

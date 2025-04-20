@@ -40,7 +40,7 @@ function incrementPDFsProcessed(success = true) {
 // Obtener información del sistema
 async function getSystemInfo() {
   try {
-    // Usar caché para reducir consultas frecuentes
+    // Usar caché para reducir consultas frecuentes con throttling agresivo
     return await cacheService.getOrSet('system_info', async () => {
       // Información de recursos del sistema
       const cpus = os.cpus();
@@ -53,23 +53,58 @@ async function getSystemInfo() {
 
       try {
         // Contar documentos por estado (usando caché para consultas frecuentes)
+        // Aumentar TTL a 120 segundos y usar throttling agresivo (15 segundos mínimo entre consultas)
         documentCounts = await cacheService.getOrSet('document_counts', async () => {
           try {
-            const PDFDocument = await getPDFDocumentModel();
-            const processing = await PDFDocument.countDocuments({ s: 'p' });
-            const completed = await PDFDocument.countDocuments({ s: 'c' });
-            const error = await PDFDocument.countDocuments({ s: 'e' });
-            const total = await PDFDocument.estimatedDocumentCount();
+            // Verificar si debemos throttlear esta consulta (muy costosa)
+            if (cacheService.shouldThrottle('db_document_counts', 15000)) {
+              console.log('Consulta de conteo de documentos throttled, usando valores en caché o predeterminados');
+              // Devolver valores predeterminados o los últimos conocidos
+              const lastCounts = cacheService.get('last_document_counts');
+              return lastCounts || { processing: 0, completed: 0, error: 0, total: 0 };
+            }
 
-            return { processing, completed, error, total };
+            console.log('Realizando consulta de conteo de documentos a la base de datos');
+            const PDFDocument = await getPDFDocumentModel();
+
+            // Usar una sola consulta de agregación para obtener todos los conteos
+            // Esto es mucho más eficiente que hacer múltiples consultas
+            const aggregationResult = await PDFDocument.aggregate([
+              {
+                $group: {
+                  _id: '$s', // Agrupar por estado
+                  count: { $sum: 1 } // Contar documentos
+                }
+              }
+            ]);
+
+            // Procesar resultados
+            const counts = { processing: 0, completed: 0, error: 0, total: 0 };
+            aggregationResult.forEach(result => {
+              if (result._id === 'p') counts.processing = result.count;
+              else if (result._id === 'c') counts.completed = result.count;
+              else if (result._id === 'e') counts.error = result.count;
+            });
+
+            // Calcular total
+            counts.total = counts.processing + counts.completed + counts.error;
+
+            // Guardar como últimos valores conocidos
+            cacheService.set('last_document_counts', counts, 300); // 5 minutos
+
+            return counts;
           } catch (dbError) {
             console.error('Error al obtener conteo de documentos:', dbError);
-            return { processing: 0, completed: 0, error: 0, total: 0 };
+            // Intentar usar los últimos valores conocidos
+            const lastCounts = cacheService.get('last_document_counts');
+            return lastCounts || { processing: 0, completed: 0, error: 0, total: 0 };
           }
-        }, 60); // Caché de 60 segundos
+        }, 120, { minInterval: 15000 }); // Caché de 120 segundos, mínimo 15 segundos entre consultas
       } catch (cacheError) {
         console.error('Error al usar caché para conteo de documentos:', cacheError);
-        // Continuar con valores predeterminados
+        // Continuar con valores predeterminados o últimos conocidos
+        const lastCounts = cacheService.get('last_document_counts');
+        documentCounts = lastCounts || { processing: 0, completed: 0, error: 0, total: 0 };
       }
 
       // Información de conexiones a MongoDB
@@ -149,7 +184,7 @@ async function getSystemInfo() {
 // Verificar si el sistema está sobrecargado
 async function isSystemOverloaded() {
   try {
-    // Usar caché para reducir consultas frecuentes
+    // Usar caché para reducir consultas frecuentes con throttling agresivo
     return await cacheService.getOrSet('system_overload_check', async () => {
       // Verificar carga del sistema
       const loadAvg = os.loadavg()[0]; // Carga promedio de 1 minuto
@@ -161,25 +196,42 @@ async function isSystemOverloaded() {
       const freeMemory = os.freemem();
       const memoryUsage = 1 - (freeMemory / totalMemory);
 
-      // Verificar documentos en procesamiento
+      // Verificar documentos en procesamiento - usar caché existente para evitar consultas adicionales
       let processingCount = 0;
       try {
-        const PDFDocument = await getPDFDocumentModel();
-        processingCount = await PDFDocument.countDocuments({ s: 'p' });
+        // Intentar obtener el conteo desde la caché de document_counts
+        const cachedCounts = cacheService.get('document_counts') || cacheService.get('last_document_counts');
+        if (cachedCounts && typeof cachedCounts.processing === 'number') {
+          processingCount = cachedCounts.processing;
+          console.log('Usando conteo en caché para verificación de sobrecarga:', processingCount);
+        } else {
+          // Si no está en caché, verificar si debemos throttlear
+          if (cacheService.shouldThrottle('overload_processing_check', 10000)) {
+            console.log('Consulta de sobrecarga throttled, usando valor predeterminado');
+            // Usar un valor conservador
+            processingCount = 5;
+          } else {
+            // Realizar la consulta a la base de datos
+            console.log('Realizando consulta de conteo para verificación de sobrecarga');
+            const PDFDocument = await getPDFDocumentModel();
+            processingCount = await PDFDocument.countDocuments({ s: 'p' });
+          }
+        }
       } catch (dbError) {
         console.error('Error al obtener documentos en procesamiento:', dbError);
         // Continuar con processingCount = 0
       }
 
       // Determinar si el sistema está sobrecargado
-      const isOverloaded = normalizedLoad > 0.8 || memoryUsage > 0.85 || processingCount > 20;
+      // Ajustar umbrales para ser más conservadores
+      const isOverloaded = normalizedLoad > 0.7 || memoryUsage > 0.8 || processingCount > 15;
 
-      return {
+      const result = {
         isOverloaded,
         factors: {
-          cpuOverloaded: normalizedLoad > 0.8,
-          memoryOverloaded: memoryUsage > 0.85,
-          processingOverloaded: processingCount > 20
+          cpuOverloaded: normalizedLoad > 0.7,
+          memoryOverloaded: memoryUsage > 0.8,
+          processingOverloaded: processingCount > 15
         },
         metrics: {
           normalizedLoad,
@@ -187,7 +239,12 @@ async function isSystemOverloaded() {
           processingCount
         }
       };
-    }, 5); // Caché de 5 segundos
+
+      // Guardar el resultado para referencia futura
+      cacheService.set('last_overload_check', result, 300); // 5 minutos
+
+      return result;
+    }, 10, { minInterval: 5000 }); // Caché de 10 segundos, mínimo 5 segundos entre consultas
   } catch (error) {
     console.error('Error al verificar sobrecarga del sistema:', error);
     // En caso de error, asumir que no está sobrecargado para evitar bloqueos
