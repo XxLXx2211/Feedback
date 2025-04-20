@@ -2,25 +2,19 @@ FROM node:18-slim
 
 WORKDIR /app
 
-# Copiar archivos de dependencias
-COPY package*.json ./
-COPY server/package*.json ./server/
-
-# Instalar dependencias con --legacy-peer-deps para evitar problemas de compatibilidad
-RUN npm install --production --legacy-peer-deps
-WORKDIR /app/server
-RUN npm install --production --legacy-peer-deps
-WORKDIR /app
-
-# Copiar el resto de archivos
+# Copiar todo el código fuente
 COPY . .
 
+# Instalar dependencias
+RUN npm install --production
+RUN cd server && npm install --production
+
 # Configurar variables de entorno
-ENV PORT=8080
+ENV PORT=10000
 ENV NODE_ENV=production
 
 # Exponer puerto
-EXPOSE 8080
+EXPOSE 10000
 
 # Comando para iniciar
 CMD ["node", "server/app.js"]

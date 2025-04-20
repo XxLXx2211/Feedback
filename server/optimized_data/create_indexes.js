@@ -32,3 +32,10 @@ db.feedbacklinks.createIndex({"f":1}, {"background":true});
 db.feedbacklinks.createIndex({"e":1}, {"background":true});
 db.feedbacklinks.createIndex({"a":1}, {"background":true,"sparse":true});
 
+// Índices para pdfdocuments
+db.pdfdocuments.createIndex({"s":1}, {"background":true});
+db.pdfdocuments.createIndex({"t":1}, {"background":true});
+db.pdfdocuments.createIndex({"f":1}, {"background":true});
+db.pdfdocuments.createIndex({"creado":-1}, {"background":true});
+db.pdfdocuments.createIndex({"tx":"text","t":"text"}, {"background":true,"weights":{"t":10,"tx":5}});
+

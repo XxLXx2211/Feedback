@@ -169,5 +169,52 @@
         "sparse": true
       }
     }
+  ],
+  "pdfdocuments": [
+    {
+      "key": {
+        "s": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "t": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "f": 1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "creado": -1
+      },
+      "options": {
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "tx": "text",
+        "t": "text"
+      },
+      "options": {
+        "background": true,
+        "weights": {
+          "t": 10,
+          "tx": 5
+        }
+      }
+    }
   ]
 }

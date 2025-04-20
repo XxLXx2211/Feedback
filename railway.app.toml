@@ -1,0 +1,12 @@
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+healthcheck_path = "/api/health"
+healthcheck_timeout_sec = 300
+num_instances = 1
+
+[service]
+internal_port = 10000
+auto_stop_machines = false
+auto_start_machines = true

@@ -22,7 +22,8 @@ mongoose.set('bufferCommands', true);
 const connectMainDatabase = async () => {
   try {
     // Usar MongoDB Atlas como base de datos principal
-    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/feedback-system';
+    const MONGODB_URI = process.env.MONGODB_URI;
+    console.log('MONGODB_URI:', process.env.MONGODB_URI);
 
     if (!MONGODB_URI) {
       throw new Error('No se ha definido la URL de conexión a MongoDB');
