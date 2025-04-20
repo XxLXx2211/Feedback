@@ -48,10 +48,7 @@ const connectMainDatabase = async () => {
       retryWrites: true,
       w: 'majority',
       keepAlive: true, // Mantener conexiones activas
-      autoIndex: false, // Desactivar creación automática de índices (los creamos manualmente)
-      bufferMaxEntries: 0, // Desactivar buffer de comandos cuando se desconecta
-      useNewUrlParser: true,
-      useUnifiedTopology: true
+      autoIndex: false // Desactivar creación automática de índices (los creamos manualmente)
     };
 
     while (retries > 0) {
