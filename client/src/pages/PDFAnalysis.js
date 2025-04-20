@@ -113,7 +113,7 @@ const PDFAnalysis = () => {
       const newDocsJson = JSON.stringify(newDocuments.map(d => ({ id: d._id, status: d.status })));
       const hasChanges = currentDocsJson !== newDocsJson;
 
-      if (hasChanges) {
+      if (hasChanges || showLoading) {
         console.log('Actualizando lista de documentos');
 
         // Verificar si algún documento cambió de estado a 'completed'
@@ -123,21 +123,49 @@ const PDFAnalysis = () => {
         });
 
         // Preparar los documentos para la actualización
-        const preparedDocuments = newDocuments.map(doc => ({
-          ...doc,
-          // Inicializar propiedades para el análisis
-          analysisLoaded: false,
-          analysisLoading: false,
-          geminiAnalysis: null
-        }));
+        const preparedDocuments = newDocuments.map(doc => {
+          // Buscar si el documento ya existe en la lista actual
+          const existingDoc = documents.find(d => d._id === doc._id);
+
+          // Si el documento ya existe y tiene análisis cargado, mantener esa información
+          if (existingDoc && existingDoc.geminiAnalysis) {
+            return {
+              ...doc,
+              analysisLoaded: true,
+              analysisLoading: false,
+              geminiAnalysis: existingDoc.geminiAnalysis
+            };
+          }
+
+          // Si el documento ya existe y está cargando análisis, mantener ese estado
+          if (existingDoc && existingDoc.analysisLoading) {
+            return {
+              ...doc,
+              analysisLoaded: false,
+              analysisLoading: true,
+              geminiAnalysis: null
+            };
+          }
+
+          // Para documentos nuevos o sin análisis, inicializar propiedades
+          return {
+            ...doc,
+            analysisLoaded: false,
+            analysisLoading: false,
+            geminiAnalysis: null
+          };
+        });
 
         // Actualizar la lista de documentos
         setDocuments(preparedDocuments);
 
-        // Cargar análisis para documentos completados (en segundo plano)
+        // Cargar análisis para documentos completados que no tienen análisis cargado
         preparedDocuments.forEach(doc => {
-          if (doc.status === 'completed') {
-            // Cargar el análisis en segundo plano
+          if (doc.status === 'completed' && !doc.analysisLoaded && !doc.analysisLoading) {
+            // Marcar como cargando para evitar múltiples solicitudes
+            doc.analysisLoading = true;
+
+            // Cargar el análisis en segundo plano con un pequeño retraso
             setTimeout(() => {
               loadDocumentAnalysis(doc._id);
             }, 500);
@@ -203,24 +231,26 @@ const PDFAnalysis = () => {
       formData.append('title', fileTitle || selectedFile.name);
       formData.append('description', fileDescription);
 
-      await uploadPDF(formData);
+      // Subir el PDF
+      const uploadedDoc = await uploadPDF(formData);
+      console.log('Documento subido:', uploadedDoc);
 
       setUploadSuccess('Archivo subido correctamente. El documento se está procesando...');
       setSelectedFile(null);
       setFileTitle('');
       setFileDescription('');
 
-      // Recargar la lista de documentos
-      await loadDocuments();
-
-      // Iniciar polling para verificar cuando el documento esté procesado
-      startPolling();
-
       // Limpiar el input de archivo
       const fileInput = document.getElementById('file-upload');
       if (fileInput) {
         fileInput.value = '';
       }
+
+      // Recargar la lista de documentos
+      await loadDocuments(true);
+
+      // Iniciar polling para verificar cuando el documento esté procesado
+      startPolling();
     } catch (err) {
       console.error('Error al subir archivo:', err);
       setUploadError('Error al subir el archivo. Por favor, intenta de nuevo.');
@@ -400,35 +430,83 @@ const PDFAnalysis = () => {
   const loadDocumentAnalysis = async (docId) => {
     try {
       console.log(`Cargando análisis para documento ${docId}...`);
+
+      // Verificar si el documento existe en la lista actual
+      const docIndex = documents.findIndex(d => d._id === docId);
+      if (docIndex === -1) {
+        console.warn(`Documento ${docId} no encontrado en la lista actual`);
+        return null;
+      }
+
+      // Verificar si el documento ya tiene análisis cargado
+      if (documents[docIndex].analysisLoaded && documents[docIndex].geminiAnalysis) {
+        console.log(`El documento ${docId} ya tiene análisis cargado`);
+        return documents[docIndex].geminiAnalysis;
+      }
+
+      // Marcar el documento como cargando (para evitar múltiples solicitudes)
+      const updatingDocs = [...documents];
+      updatingDocs[docIndex] = {
+        ...updatingDocs[docIndex],
+        analysisLoading: true
+      };
+      setDocuments(updatingDocs);
+
+      // Solicitar el análisis al servidor
       const response = await analyzePDF(docId);
+      console.log(`Respuesta de análisis para documento ${docId}:`, response);
 
       // Verificar si la respuesta contiene el análisis
       if (response && response.analysis) {
-        // Buscar el documento en la lista
-        const docIndex = documents.findIndex(d => d._id === docId);
-        if (docIndex !== -1) {
-          // Crear una copia del documento
-          const updatedDoc = { ...documents[docIndex] };
+        // Obtener la lista actualizada de documentos (puede haber cambiado mientras se cargaba)
+        const currentDocIndex = documents.findIndex(d => d._id === docId);
+        if (currentDocIndex !== -1) {
+          // Crear una copia de la lista actual de documentos
+          const updatedDocs = [...documents];
 
           // Actualizar el documento con el análisis
-          updatedDoc.geminiAnalysis = response.analysis;
-          updatedDoc.analysisLoaded = true;
-          updatedDoc.analysisLoading = false;
-
-          // Crear una copia de la lista de documentos
-          const updatedDocs = [...documents];
-          updatedDocs[docIndex] = updatedDoc;
+          updatedDocs[currentDocIndex] = {
+            ...updatedDocs[currentDocIndex],
+            geminiAnalysis: response.analysis,
+            analysisLoaded: true,
+            analysisLoading: false
+          };
 
           // Actualizar el estado
           setDocuments(updatedDocs);
 
-          console.log(`Análisis cargado para documento ${docId}`);
+          console.log(`Análisis cargado correctamente para documento ${docId}`);
           return response.analysis;
+        }
+      } else {
+        // Si no hay análisis en la respuesta, marcar como cargado pero sin datos
+        const currentDocIndex = documents.findIndex(d => d._id === docId);
+        if (currentDocIndex !== -1) {
+          const updatedDocs = [...documents];
+          updatedDocs[currentDocIndex] = {
+            ...updatedDocs[currentDocIndex],
+            analysisLoaded: true,
+            analysisLoading: false,
+            geminiAnalysis: 'No se encontró análisis para este documento.'
+          };
+          setDocuments(updatedDocs);
         }
       }
       return null;
     } catch (error) {
       console.error(`Error al cargar análisis para documento ${docId}:`, error);
+
+      // Marcar el documento como no cargando en caso de error
+      const docIndex = documents.findIndex(d => d._id === docId);
+      if (docIndex !== -1) {
+        const updatedDocs = [...documents];
+        updatedDocs[docIndex] = {
+          ...updatedDocs[docIndex],
+          analysisLoading: false
+        };
+        setDocuments(updatedDocs);
+      }
+
       return null;
     }
   };
