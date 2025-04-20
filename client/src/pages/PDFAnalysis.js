@@ -420,16 +420,51 @@ const PDFAnalysis = () => {
       };
     }
 
-    // Intentar obtener el análisis de Gemini
-    const getDocumentDetails = async (id) => {
-      try {
-        const response = await getDocument(id);
-        return response;
-      } catch (error) {
-        console.error('Error al obtener detalles del documento:', error);
-        return null;
-      }
-    };
+    // Verificar si necesitamos cargar el análisis
+    if (!doc.analysisLoaded && !doc.analysisLoading) {
+      // Marcar que estamos cargando el análisis
+      doc.analysisLoading = true;
+
+      // Cargar el análisis de forma asíncrona
+      const loadAnalysis = async () => {
+        try {
+          console.log(`Cargando análisis para documento ${doc._id}...`);
+          const response = await analyzePDF(doc._id);
+
+          if (response && response.analysis) {
+            // Guardar el análisis en el documento
+            doc.geminiAnalysis = response.analysis;
+            doc.analysisLoaded = true;
+            doc.analysisLoading = false;
+
+            // Forzar una actualización de la interfaz
+            setDocuments([...documents]);
+          }
+        } catch (error) {
+          console.error('Error al cargar análisis:', error);
+          doc.analysisLoading = false;
+        }
+      };
+
+      // Ejecutar la carga del análisis
+      loadAnalysis();
+
+      // Mientras se carga, mostrar un estado de carga
+      return {
+        icon: '⏳',
+        text: 'Cargando...',
+        class: 'loading'
+      };
+    }
+
+    // Si el análisis está cargando, mostrar un estado de carga
+    if (doc.analysisLoading) {
+      return {
+        icon: '⏳',
+        text: 'Cargando...',
+        class: 'loading'
+      };
+    }
 
     // Contar los diferentes estados en los resultados
     let excelente = 0;
@@ -438,9 +473,8 @@ const PDFAnalysis = () => {
     let deficiente = 0;
     let total = 0;
 
-    // Analizar el texto del análisis de Gemini
+    // Analizar el texto del análisis
     if (doc.geminiAnalysis) {
-      // Usar el análisis de Gemini directamente
       const analysisText = doc.geminiAnalysis;
 
       // Buscar patrones como "El estado del "X" es Y"
@@ -461,53 +495,6 @@ const PDFAnalysis = () => {
         } else if (state === 'D' || state === 'DEFICIENTE' || state.includes('DEFICIENTE')) {
           deficiente++;
         }
-      }
-    } else {
-      // Intentar cargar el documento para obtener el análisis
-      console.log('Cargando detalles del documento para análisis...');
-
-      // Hacer una solicitud para obtener el análisis
-      const loadAnalysis = async () => {
-        try {
-          const response = await analyzePDF(doc._id);
-          if (response && response.data && response.data.analysis) {
-            const analysisText = response.data.analysis;
-
-            // Buscar patrones como "El estado del "X" es Y"
-            const statePattern = /El estado del "([^"]+)" es ([^\n]+)/g;
-            let match;
-
-            while ((match = statePattern.exec(analysisText)) !== null) {
-              const element = match[1];
-              const state = match[2].trim().toUpperCase();
-
-              total++;
-              if (state === 'E' || state === 'EXCELENTE') {
-                excelente++;
-              } else if (state === 'B' || state === 'BUENO') {
-                bien++;
-              } else if (state === 'R' || state === 'REGULAR') {
-                regular++;
-              } else if (state === 'D' || state === 'DEFICIENTE' || state.includes('DEFICIENTE')) {
-                deficiente++;
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error al cargar análisis:', error);
-        }
-      };
-
-      // Ejecutar la carga de análisis (no esperamos a que termine)
-      loadAnalysis();
-
-      // Si no tenemos datos suficientes, devolver un estado desconocido
-      if (total === 0) {
-        return {
-          icon: '❓',
-          text: 'Sin datos',
-          class: 'unknown'
-        };
       }
     }
 

@@ -218,10 +218,29 @@ export const analyzePDF = async (id) => {
     console.log(`Analizando documento ${id}`);
     const response = await API.post(`/pdf/analyze/${id}`);
     console.log('Respuesta del servidor (análisis):', response);
-    return response;
+
+    // Verificar la estructura de la respuesta y normalizarla
+    if (response && response.data) {
+      // Si la respuesta tiene la estructura esperada, devolverla directamente
+      return response.data;
+    } else if (response && response.analysis) {
+      // Si la respuesta tiene el análisis directamente, devolverla
+      return response;
+    } else {
+      // Si la respuesta no tiene la estructura esperada, crear una estructura compatible
+      return {
+        analysis: 'No se pudo obtener el análisis del documento.',
+        formattedAnalysis: true
+      };
+    }
   } catch (error) {
     console.error(`Error al analizar documento ${id}:`, error.response ? error.response.data : error.message);
-    throw error;
+    // Devolver un objeto de error formateado para que la interfaz pueda manejarlo
+    return {
+      analysis: 'Error al analizar el documento. Por favor, intenta de nuevo más tarde.',
+      error: true,
+      errorMessage: error.response ? error.response.data.error : error.message
+    };
   }
 };
 
