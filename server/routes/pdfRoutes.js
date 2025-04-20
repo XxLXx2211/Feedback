@@ -54,6 +54,7 @@ router.delete('/documents/:id', pdfController.deleteDocument);
 router.post('/analyze/:id', uploadLimiter, pdfController.analyzePDF);
 router.get('/view/:id', pdfController.viewPDF); // Ruta para ver el PDF sin descargar
 router.get('/analysis/:id', pdfController.getDocumentAnalysis); // Ruta para obtener el análisis detallado
+router.post('/fix-analysis/:id', pdfController.fixDocumentAnalysis); // Ruta para corregir errores de análisis
 router.post('/chat/:id', pdfController.chatWithPDF); // Ruta para chatear con el PDF
 
 module.exports = router;

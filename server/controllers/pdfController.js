@@ -1210,3 +1210,77 @@ exports.getDocumentAnalysis = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener análisis del documento' });
   }
 };
+
+/**
+ * Corregir errores de análisis en documentos
+ */
+exports.fixDocumentAnalysis = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Obtener el modelo PDFDocument
+    const PDFDocument = await getPDFDocumentModel();
+
+    // Buscar el documento
+    const document = await PDFDocument.findById(id);
+
+    if (!document) {
+      return res.status(404).json({ error: 'Documento no encontrado' });
+    }
+
+    console.log(`Iniciando corrección de análisis para documento: ${id}`);
+
+    // Verificar si hay texto extraído
+    if (!document.tx || document.tx.length === 0) {
+      return res.status(400).json({
+        error: 'No hay texto extraído para analizar',
+        status: document.s
+      });
+    }
+
+    // Intentar generar un nuevo análisis con el servicio de estado de limpieza
+    console.log('Generando nuevo análisis con servicio de estado de limpieza...');
+    const cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx);
+
+    if (!cleaningElements || cleaningElements.length === 0) {
+      return res.status(400).json({
+        error: 'No se pudieron detectar elementos de limpieza',
+        elementsFound: 0
+      });
+    }
+
+    console.log(`Se encontraron ${cleaningElements.length} elementos de limpieza`);
+    const formattedText = cleaningStatusService.generateGeminiAnalysisText(cleaningElements);
+    const summary = cleaningStatusService.generateCleaningSummary(cleaningElements);
+
+    // Guardar el nuevo análisis en el documento
+    await PDFDocument.findByIdAndUpdate(id, {
+      g: formattedText,
+      a: JSON.stringify({
+        elements: cleaningElements,
+        summary: summary
+      }),
+      s: 'c' // Marcar como completado
+    });
+
+    // Invalidar caché relacionada con este documento
+    cacheService.del(`document_${id}`);
+    cacheService.del(`analysis_${id}`);
+
+    // Responder con el nuevo análisis
+    return res.status(200).json({
+      success: true,
+      message: 'Análisis corregido exitosamente',
+      elementsFound: cleaningElements.length,
+      analysis: formattedText,
+      summary: summary
+    });
+
+  } catch (error) {
+    console.error('Error al corregir análisis del documento:', error);
+    res.status(500).json({
+      error: 'Error al corregir análisis del documento',
+      message: error.message
+    });
+  }
+};
