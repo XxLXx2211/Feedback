@@ -6,9 +6,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY server/package*.json ./server/
 
-# Instalar dependencias
-RUN npm install --production
-RUN cd server && npm install --production
+# Instalar dependencias con --legacy-peer-deps para evitar problemas de compatibilidad
+RUN npm install --production --legacy-peer-deps
+RUN cd server && npm install --production --legacy-peer-deps
 
 # Copiar el resto de archivos
 COPY . .
