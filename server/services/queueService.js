@@ -195,8 +195,9 @@ setInterval(() => {
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();
   const memoryUsage = 1 - (freeMemory / totalMemory);
-  // Umbrales ajustados para Railway con 48 CPUs: 80% CPU normalizado o 85% memoria
-  const isCurrentlyOverloaded = (cpuUsage / os.cpus().length) > 0.8 || memoryUsage > 0.85;
+  // Umbrales ajustados para Railway: 80% CPU normalizado o 85% memoria o menos de 100MB libres
+  const freeMemoryMB = Math.round(freeMemory / (1024 * 1024));
+  const isCurrentlyOverloaded = (cpuUsage / os.cpus().length) > 0.8 || memoryUsage > 0.85 || freeMemoryMB < 100;
 
   // Actualizar estado del sistema
   systemLoad = {
@@ -225,7 +226,7 @@ setInterval(() => {
     // Calcular el porcentaje de CPU basado en la carga promedio y el número de CPUs
     const cpuCount = os.cpus().length;
     const cpuLoadPercent = Math.round((cpuUsage / cpuCount) * 100);
-    console.log(`Sistema sobrecargado (Carga: ${cpuUsage.toFixed(2)} (${cpuLoadPercent}% de ${cpuCount} CPUs), Memoria: ${Math.round(memoryUsage * 100)}%), pausando colas temporalmente`);
+    console.log(`Sistema sobrecargado (Carga: ${cpuUsage.toFixed(2)} (${cpuLoadPercent}% de ${cpuCount} CPUs), Memoria: ${Math.round(memoryUsage * 100)}% (${freeMemoryMB}MB libres)), pausando colas temporalmente`);
     pdfProcessingQueue.pause();
     pdfAnalysisQueue.pause();
 
@@ -239,7 +240,8 @@ setInterval(() => {
       const currentMemoryUsage = 1 - (os.freemem() / os.totalmem());
 
       // Verificar con los mismos umbrales ajustados
-      if ((currentCpuUsage / os.cpus().length) > 0.8 || currentMemoryUsage > 0.85) {
+      const currentFreeMemoryMB = Math.round(os.freemem() / (1024 * 1024));
+      if ((currentCpuUsage / os.cpus().length) > 0.8 || currentMemoryUsage > 0.85 || currentFreeMemoryMB < 100) {
         console.log('Sistema aún sobrecargado, extendiendo pausa...');
         // Extender la pausa otros 30 segundos
         pauseTimeout = setTimeout(() => {

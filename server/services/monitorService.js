@@ -223,19 +223,21 @@ async function isSystemOverloaded() {
       }
 
       // Determinar si el sistema está sobrecargado
-      // Umbrales ajustados para Railway con muchos recursos
-      const isOverloaded = normalizedLoad > 0.8 || memoryUsage > 0.85 || processingCount > 20;
+      // Umbrales ajustados para Railway considerando memoria absoluta
+      const freeMemoryMB = Math.round(freeMemory / (1024 * 1024));
+      const isOverloaded = normalizedLoad > 0.8 || memoryUsage > 0.85 || freeMemoryMB < 100 || processingCount > 20;
 
       const result = {
         isOverloaded,
         factors: {
           cpuOverloaded: normalizedLoad > 0.8,
-          memoryOverloaded: memoryUsage > 0.85,
+          memoryOverloaded: memoryUsage > 0.85 || freeMemoryMB < 100,
           processingOverloaded: processingCount > 20
         },
         metrics: {
           normalizedLoad,
           memoryUsage: memoryUsage.toFixed(2),
+          freeMemoryMB,
           processingCount
         }
       };
