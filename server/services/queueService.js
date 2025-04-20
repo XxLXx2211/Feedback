@@ -221,7 +221,10 @@ setInterval(() => {
       clearTimeout(pauseTimeout);
     }
 
-    console.log(`Sistema sobrecargado (CPU: ${Math.round(cpuUsage * 100)}%, Memoria: ${Math.round(memoryUsage * 100)}%), pausando colas temporalmente`);
+    // Calcular el porcentaje de CPU basado en la carga promedio y el número de CPUs
+    const cpuCount = os.cpus().length;
+    const cpuLoadPercent = Math.round((cpuUsage / cpuCount) * 100);
+    console.log(`Sistema sobrecargado (Carga: ${cpuUsage.toFixed(2)} (${cpuLoadPercent}% de ${cpuCount} CPUs), Memoria: ${Math.round(memoryUsage * 100)}%), pausando colas temporalmente`);
     pdfProcessingQueue.pause();
     pdfAnalysisQueue.pause();
 
