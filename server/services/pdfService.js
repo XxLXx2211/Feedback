@@ -50,8 +50,8 @@ async function processPDF(filePath, options = {}) {
     const fileSizeMB = fileStats.size / (1024 * 1024);
     console.log(`Tamaño del archivo: ${fileSizeMB.toFixed(2)} MB`);
 
-    // Ajustar opciones basadas en el tamaño del archivo
-    const isLargeFile = fileSizeMB > 10; // Archivos mayores a 10MB
+    // Ajustar opciones basadas en el tamaño del archivo - umbral más bajo para Railway
+    const isLargeFile = fileSizeMB > 5; // Archivos mayores a 5MB para Railway
 
     // Configurar opciones de procesamiento optimizadas para mejor detección de casillas
     // y ajustadas según el tamaño del archivo
@@ -59,7 +59,7 @@ async function processPDF(filePath, options = {}) {
       filePath: filePath,
       mode: options.mode || (isLargeFile ? 'text' : 'form'), // Modo 'text' para archivos grandes, 'form' para el resto
       waitForCompletion: options.waitForCompletion !== false,
-      waitTimeout: options.waitTimeout || (isLargeFile ? 300 : 180), // Aumentar timeout para archivos grandes
+      waitTimeout: options.waitTimeout || (isLargeFile ? 240 : 120), // Timeouts reducidos para Railway
       // Opciones adicionales para mejorar la extracción
       lang: 'spa', // Idioma español para mejor reconocimiento de texto en español
       tag: options.tag || 'supervision_efectiva', // Etiqueta personalizada para identificar el tipo de documento
@@ -120,7 +120,7 @@ async function processPDF(filePath, options = {}) {
       // Guardar en caché para futuras solicitudes
       if (!options.skipCache) {
         const cacheKey = `pdf_processed_${path.basename(filePath)}_${fs.statSync(filePath).size}`;
-        const cacheTTL = isLargeFile ? 3600 : 1800; // 1 hora para archivos grandes, 30 minutos para el resto
+        const cacheTTL = isLargeFile ? 7200 : 3600; // 2 horas para archivos grandes, 1 hora para el resto (mayor TTL para Railway)
         cacheService.set(cacheKey, processedResult, cacheTTL);
         console.log(`Resultado guardado en caché con TTL de ${cacheTTL} segundos`);
       }
@@ -413,7 +413,7 @@ async function analyzePDF(filePath) {
       extractTables: true,
       extractForms: true,
       extractImages: false, // Las imágenes pueden ser muy pesadas
-      waitTimeout: 600 // 10 minutos para análisis completo
+      waitTimeout: 300 // 5 minutos para análisis completo (reducido para Railway)
     });
 
     if (!result.success) {

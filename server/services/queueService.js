@@ -172,9 +172,9 @@ if (!isProduction || hasRedis) {
   pdfCleanupQueue = new MemoryQueue('pdf-cleanup');
 }
 
-// Configurar número de procesadores basado en CPUs disponibles
-const NUM_WORKERS = Math.max(2, Math.min(os.cpus().length - 1, 8));
-console.log(`Configurando ${NUM_WORKERS} workers para procesamiento de PDFs`);
+// Configurar número de procesadores limitado para Railway
+const NUM_WORKERS = Math.min(2, os.cpus().length);
+console.log(`Configurando ${NUM_WORKERS} workers para procesamiento de PDFs (optimizado para Railway)`);
 
 // Monitorear estado del sistema
 let systemLoad = {
@@ -195,7 +195,7 @@ setInterval(() => {
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();
   const memoryUsage = 1 - (freeMemory / totalMemory);
-  const isCurrentlyOverloaded = cpuUsage > 0.7 || memoryUsage > 0.8; // Umbrales más bajos: 70% CPU o 80% memoria
+  const isCurrentlyOverloaded = cpuUsage > 0.6 || memoryUsage > 0.7; // Umbrales más bajos para Railway: 60% CPU o 70% memoria
 
   // Actualizar estado del sistema
   systemLoad = {
@@ -310,8 +310,8 @@ pdfProcessingQueue.process(NUM_WORKERS, async (job) => {
   }
 });
 
-// Analizar PDFs (análisis detallado)
-pdfAnalysisQueue.process(Math.max(1, NUM_WORKERS / 2), async (job) => {
+// Analizar PDFs (análisis detallado) - limitado a 1 worker para Railway
+pdfAnalysisQueue.process(1, async (job) => {
   const { pdfId } = job.data;
   console.log(`Analizando PDF ${pdfId} (Job ${job.id})`);
 

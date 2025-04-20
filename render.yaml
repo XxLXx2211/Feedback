@@ -5,7 +5,7 @@ services:
     env: node
     plan: free
     buildCommand: cd server && npm install --production
-    startCommand: cd server && node scripts/createIndexes.js && node app.js
+    startCommand: cd server && node app.js
     healthCheckPath: /api/status
     envVars:
       - key: NODE_ENV
@@ -37,15 +37,11 @@ services:
       - key: CACHE_CHECK_PERIOD
         value: 60
       - key: MAX_CONCURRENT_PROCESSING
-        value: 8
+        value: 2
       - key: PDF_PROCESSING_TIMEOUT
         value: 300
-      # Configuración de Redis (opcional)
-      - key: REDIS_HOST
-        value: "localhost"
-      - key: REDIS_PORT
-        value: 6379
-      - key: REDIS_TLS
+      # Desactivar Redis para reducir uso de recursos
+      - key: REDIS_ENABLED
         value: "false"
 
   # Frontend Static Site
