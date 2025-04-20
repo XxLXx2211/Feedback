@@ -3,6 +3,7 @@ const path = require('path');
 const { analyzePDF } = require('../services/pdfService');
 const { analyzeWithGemini, generateChatResponse } = require('../services/aiService');
 const cacheService = require('../services/cacheService');
+const cleaningStatusService = require('../services/cleaningStatusService');
 
 // Importar modelo para documentos PDF
 const { initModel } = require('../models/PDFDocument');
@@ -349,14 +350,43 @@ exports.analyzePDF = async (req, res) => {
             });
           }
 
-          // Si no tenemos elementos estructurados, usar el texto para análisis con Gemini
-          let textToAnalyze = document.tx;
+          // Usar nuestro servicio mejorado de detección de estado de limpieza
+          console.log('Analizando estado de limpieza con servicio mejorado...');
+          const cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx);
 
-          // Verificar si el texto ya contiene la sección de elementos de inspección
-          // No añadimos información adicional para el análisis
+          // Si encontramos elementos con nuestro servicio, usarlos
+          if (cleaningElements && cleaningElements.length > 0) {
+            console.log(`Se encontraron ${cleaningElements.length} elementos de limpieza con el servicio mejorado`);
 
+            // Generar texto formateado para Gemini
+            const formattedText = cleaningStatusService.generateGeminiAnalysisText(cleaningElements);
+
+            // Generar resumen
+            const summary = cleaningStatusService.generateCleaningSummary(cleaningElements);
+            console.log('Resumen de estado de limpieza:', JSON.stringify(summary));
+
+            // Guardar el análisis en el documento
+            await PDFDocument.findByIdAndUpdate(id, {
+              g: formattedText,
+              // Guardar también los elementos estructurados
+              a: JSON.stringify({
+                elements: cleaningElements,
+                summary: summary
+              })
+            });
+
+            return res.status(200).json({
+              analysis: formattedText,
+              formattedAnalysis: true,
+              elements: cleaningElements,
+              summary: summary
+            });
+          }
+
+          // Si no encontramos suficientes elementos, usar Gemini como respaldo
+          console.log('No se encontraron suficientes elementos, usando Gemini como respaldo...');
           console.log('Solicitando análisis a Gemini...');
-          const geminiAnalysis = await analyzeWithGemini(textToAnalyze);
+          const geminiAnalysis = await analyzeWithGemini(document.tx);
           console.log('Análisis de Gemini recibido:', geminiAnalysis);
 
           if (geminiAnalysis) {
@@ -437,8 +467,50 @@ exports.chatWithPDF = async (req, res) => {
       return res.status(400).json({ error: 'El documento aún no ha sido procesado' });
     }
 
-    // Generar respuesta
-    const response = await generateChatResponse(message, document.tx, document.a);
+    // Generar respuesta usando el servicio mejorado
+    // Primero, verificar si hay análisis de Gemini
+    let analysisText = '';
+
+    if (document.g) {
+      // Usar análisis de Gemini si existe
+      analysisText = document.g;
+    } else if (document.a) {
+      try {
+        // Intentar parsear el análisis estructurado
+        const structuredAnalysis = JSON.parse(document.a);
+        if (structuredAnalysis && structuredAnalysis.elements) {
+          // Crear un análisis legible basado en los elementos identificados
+          analysisText = "Resultado análisis:\n";
+          structuredAnalysis.elements.forEach(el => {
+            analysisText += `El estado del "${el.element}" es ${el.state}\n`;
+          });
+
+          // Añadir observaciones
+          analysisText += "\nObservaciones:\n";
+          structuredAnalysis.elements.forEach(el => {
+            if (el.observation) {
+              analysisText += `• ${el.observation}\n`;
+            }
+          });
+        }
+      } catch (parseError) {
+        console.error('Error al parsear análisis estructurado:', parseError);
+        // Usar el análisis como texto si no se puede parsear
+        analysisText = document.a;
+      }
+    }
+
+    // Si no hay análisis, intentar generarlo con el servicio de estado de limpieza
+    if (!analysisText && document.tx) {
+      console.log('Generando análisis de estado de limpieza para el chat...');
+      const cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx);
+      if (cleaningElements && cleaningElements.length > 0) {
+        analysisText = cleaningStatusService.generateGeminiAnalysisText(cleaningElements);
+      }
+    }
+
+    // Generar respuesta con toda la información disponible
+    const response = await generateChatResponse(message, document.tx, analysisText || document.a || '');
 
     if (!response) {
       return res.status(500).json({ error: 'Error al generar respuesta' });
@@ -679,13 +751,45 @@ async function performGeminiAnalysis(documentId, extractedText) {
       return;
     }
 
+    // Paso 1: Intentar usar nuestro servicio mejorado de detección de estado de limpieza
+    console.log('Analizando estado de limpieza con servicio mejorado...');
+    const cleaningElements = cleaningStatusService.analyzeCleaningStatus(extractedText);
+
+    // Obtener el modelo PDFDocument
+    const PDFDocument = await getPDFDocumentModel();
+
+    // Si encontramos elementos con nuestro servicio, usarlos
+    if (cleaningElements && cleaningElements.length > 0) {
+      console.log(`Se encontraron ${cleaningElements.length} elementos de limpieza con el servicio mejorado`);
+
+      // Generar texto formateado para Gemini
+      const formattedText = cleaningStatusService.generateGeminiAnalysisText(cleaningElements);
+
+      // Generar resumen
+      const summary = cleaningStatusService.generateCleaningSummary(cleaningElements);
+      console.log('Resumen de estado de limpieza:', JSON.stringify(summary));
+
+      // Actualizar el documento con el análisis mejorado
+      await PDFDocument.findByIdAndUpdate(documentId, {
+        g: formattedText, // Campo abreviado para análisis de Gemini
+        // Guardar también los elementos estructurados
+        a: JSON.stringify({
+          elements: cleaningElements,
+          summary: summary
+        })
+      });
+
+      console.log(`Análisis mejorado completado: ${formattedText.length} caracteres`);
+      console.log(`Análisis mejorado completado para documento: ${documentId}`);
+      return;
+    }
+
+    // Paso 2: Si no encontramos suficientes elementos, usar Gemini como respaldo
+    console.log(`No se encontraron suficientes elementos, usando Gemini como respaldo...`);
     console.log(`Enviando prompt a Gemini...`);
     const geminiAnalysis = await analyzeWithGemini(extractedText);
 
     if (geminiAnalysis) {
-      // Obtener el modelo PDFDocument
-      const PDFDocument = await getPDFDocumentModel();
-
       // Actualizar el documento con el análisis de Gemini
       await PDFDocument.findByIdAndUpdate(documentId, {
         g: geminiAnalysis // Campo abreviado para análisis de Gemini

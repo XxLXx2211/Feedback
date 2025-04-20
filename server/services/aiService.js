@@ -1,24 +1,58 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const cleaningStatusService = require('./cleaningStatusService');
+const cacheService = require('./cacheService');
 
 // Configurar cliente de Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /**
- * Analiza texto usando Gemini API
+ * Analiza texto usando el servicio de detección de estado de limpieza y Gemini API
  * @param {string} text - Texto a analizar
  * @returns {Promise<string|null>} - Resultado del análisis o null si hay error
  */
 async function analyzeWithGemini(text) {
   if (!text) return null;
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  try {
+    console.log('Iniciando análisis mejorado de estado de limpieza...');
 
-  // Buscar secciones especiales en el texto
-  let specialSections = '';
-  // No buscamos secciones especiales
+    // Usar caché si está disponible
+    const cacheKey = `gemini_analysis_${Buffer.from(text.substring(0, 100)).toString('base64')}`;
+    const cachedResult = cacheService.get(cacheKey);
 
-  // Crear un prompt mejorado que preste especial atención a las secciones especiales
-  const prompt = `Analiza el siguiente texto que proviene de un formulario de inspección.
+    if (cachedResult) {
+      console.log('Usando resultado en caché para análisis de Gemini');
+      return cachedResult;
+    }
+
+    // Paso 1: Analizar el texto con nuestro servicio especializado
+    console.log('Analizando texto con servicio de detección de estado de limpieza...');
+    const cleaningElements = cleaningStatusService.analyzeCleaningStatus(text);
+
+    // Paso 2: Si encontramos elementos, generar texto formateado para Gemini
+    if (cleaningElements && cleaningElements.length > 0) {
+      console.log(`Se encontraron ${cleaningElements.length} elementos de limpieza`);
+
+      // Generar texto formateado para Gemini
+      const formattedText = cleaningStatusService.generateGeminiAnalysisText(cleaningElements);
+
+      // Generar resumen
+      const summary = cleaningStatusService.generateCleaningSummary(cleaningElements);
+      console.log('Resumen de estado de limpieza:', JSON.stringify(summary));
+
+      // Guardar en caché
+      cacheService.set(cacheKey, formattedText, 3600); // 1 hora
+
+      return formattedText;
+    }
+
+    // Paso 3: Si no encontramos elementos o son muy pocos, usar Gemini como respaldo
+    console.log('No se encontraron suficientes elementos, usando Gemini como respaldo...');
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+    // Crear un prompt mejorado para Gemini
+    const prompt = `Analiza el siguiente texto que proviene de un formulario de inspección de limpieza.
 
   Analiza el texto para identificar el estado de los elementos inspeccionados.
 
@@ -29,8 +63,8 @@ async function analyzeWithGemini(text) {
   Cuarta casilla: D (Deficiente)
 
   Busca patrones como:
-  - Casillas con una X dentro
-  - Casillas con un check o marca
+  - Casillas con una X dentro: [X]
+  - Casillas con un check o marca: [✓]
   - Casillas sombreadas o rellenadas
   - Cualquier símbolo o marca que indique selección
   - Texto como "MARCADO", "MARCADA", etc.
@@ -46,41 +80,37 @@ async function analyzeWithGemini(text) {
   El estado del "Azoteas" es [estado]
   El estado del "Tuberías" es [estado]
   El estado del "Rocas" es [estado]
-  El estado del "Vidrios Internos y Externos" es [estado]
-  El estado del "Escalera y Pasamanos" es [estado]
-  El estado del "Rejillas de Aire Acondicionado" es [estado]
-  El estado del "Rejillas Extracción de Aire" es [estado]
+  El estado del "Vidrios" es [estado]
+  El estado del "Escalera" es [estado]
+  El estado del "Rejillas" es [estado]
   El estado del "Mallas" es [estado]
   El estado del "Elevadores" es [estado]
   El estado del "Paredes" es [estado]
-  El estado del "Rack de Cableados" es [estado]
+  El estado del "Rack" es [estado]
   El estado del "Puntos Muertos" es [estado]
   El estado del "Pisos" es [estado]
   El estado del "Santamaría" es [estado]
   El estado del "Extintores" es [estado]
   El estado del "Lámparas" es [estado]
-  El estado del "Puertas en General" es [estado]
-  El estado del "Cortinas Plásticas" es [estado]
+  El estado del "Puertas" es [estado]
+  El estado del "Cortinas" es [estado]
   El estado del "Portones" es [estado]
   El estado del "Plataformas" es [estado]
   El estado del "Defensas" es [estado]
-  El estado del "Vigas Estructurales" es [estado]
-  El estado del "Baños de Contratistas" es [estado]
-  El estado del "Tolva" es [estado]
-  El estado del "Nevera y Filtro de Agua Comedor" es [estado]
-  El estado del "Micro Ondas Comedor" es [estado]
-  El estado del "Área General de Comedor" es [estado]
-  El estado del "Canaletas de Techo" es [estado]
-  El estado del "Canales Fluviales" es [estado]
-  El estado del "Camineria Interna" es [estado]
-  El estado del "Caminaría Externa" es [estado]
-  El estado del "Avisos de Señalización" es [estado]
-  El estado del "Silos Externos" es [estado]
-  El estado del "ESTACIÓN DE MANO" es [estado]
-  El estado del "Umbrales de Ventanas" es R
+  El estado del "Vigas" es [estado]
+  El estado del "Baños" es [estado]
+  El estado del "Nevera" es [estado]
+  El estado del "Micro Ondas" es [estado]
+  El estado del "Comedor" es [estado]
+  El estado del "Canaletas" es [estado]
+  El estado del "Canales" es [estado]
+  El estado del "Camineria" es [estado]
+  El estado del "Avisos" es [estado]
+  El estado del "Silos" es [estado]
+  El estado del "Umbrales de Ventanas" es [estado]
 
   Observaciones:
-  • CON POLVO DE DÍAS
+  • [Observación 1 si existe]
   • [Observación 2 si existe]
   • [Observación 3 si existe]
 
@@ -93,20 +123,35 @@ async function analyzeWithGemini(text) {
   - Asegúrate de incluir TODOS los elementos listados, incluso si no encuentras información sobre ellos.
 
   Texto a analizar:
-  ${specialSections || text}`;
+  ${text}`;
 
-  try {
     console.log('Enviando prompt a Gemini...');
-
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
     console.log(`Análisis con Gemini completado: ${responseText.length} caracteres`);
 
+    // Guardar en caché
+    cacheService.set(cacheKey, responseText, 3600); // 1 hora
+
     return responseText;
   } catch (error) {
-    console.error('Error al analizar con Gemini:', error);
-    return null;
+    console.error('Error en el análisis de estado de limpieza:', error);
+
+    // Intentar usar solo Gemini como último recurso
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const prompt = `Analiza el siguiente texto que proviene de un formulario de inspección y extrae cualquier información sobre el estado de limpieza de los elementos. Formatea la respuesta como una lista de elementos y su estado.
+
+      Texto a analizar:
+      ${text}`;
+
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch (geminiError) {
+      console.error('Error al analizar con Gemini:', geminiError);
+      return null;
+    }
   }
 }
 
@@ -119,13 +164,50 @@ async function analyzeWithGemini(text) {
  */
 async function generateChatResponse(userMessage, documentText, analysisResult) {
   try {
+    console.log('Generando respuesta de chat mejorada...');
+
+    // Usar caché si está disponible
+    const cacheKey = `chat_response_${Buffer.from(userMessage).toString('base64')}_${Buffer.from(documentText.substring(0, 50)).toString('base64')}`;
+    const cachedResult = cacheService.get(cacheKey);
+
+    if (cachedResult) {
+      console.log('Usando respuesta en caché para chat');
+      return cachedResult;
+    }
+
+    // Paso 1: Analizar el texto con nuestro servicio especializado para tener más contexto
+    const cleaningElements = cleaningStatusService.analyzeCleaningStatus(documentText);
+
+    // Paso 2: Generar un resumen del estado de limpieza
+    const cleaningSummary = cleaningStatusService.generateCleaningSummary(cleaningElements);
+
+    // Paso 3: Preparar información adicional basada en la pregunta del usuario
+    let additionalInfo = '';
+
+    // Verificar si la pregunta es sobre un elemento específico
+    const userMessageLower = userMessage.toLowerCase();
+
+    for (const element of cleaningStatusService.CLEANING_ELEMENTS) {
+      if (userMessageLower.includes(element.toLowerCase())) {
+        // Buscar información sobre este elemento
+        const elementInfo = cleaningElements.find(e => e.element.toLowerCase() === element.toLowerCase());
+
+        if (elementInfo) {
+          additionalInfo = `\nInformación adicional sobre "${element}":\n` +
+            `Estado: ${elementInfo.state}\n` +
+            `Confianza: ${Math.round(elementInfo.confidence * 100)}%\n` +
+            (elementInfo.observation ? `Observación: ${elementInfo.observation}\n` : '');
+        }
+
+        break;
+      }
+    }
+
+    // Paso 4: Usar Gemini para generar la respuesta final
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    // No buscamos secciones especiales
-  let specialSections = '';
-
-  // Crear un prompt mejorado que preste especial atención a las secciones especiales
-  const prompt = `Eres un asistente especializado en analizar documentos de inspección. Has analizado un documento con el siguiente contenido:
+    // Crear un prompt mejorado con toda la información disponible
+    const prompt = `Eres un asistente especializado en analizar documentos de inspección de limpieza. Has analizado un documento con el siguiente contenido:
 
     ${documentText}
 
@@ -133,41 +215,67 @@ async function generateChatResponse(userMessage, documentText, analysisResult) {
 
     ${analysisResult}
 
-
+    Además, tenemos la siguiente información sobre el estado general de limpieza:
+    Estado general: ${cleaningSummary.overallStatus}
+    Elementos analizados: ${cleaningSummary.elementsCount}
+    Elementos en estado Excelente: ${cleaningSummary.statusCounts.Excelente} (${cleaningSummary.statusPercentages.Excelente}%)
+    Elementos en estado Bueno: ${cleaningSummary.statusCounts.Bueno} (${cleaningSummary.statusPercentages.Bueno}%)
+    Elementos en estado Regular: ${cleaningSummary.statusCounts.Regular} (${cleaningSummary.statusPercentages.Regular}%)
+    Elementos en estado Deficiente: ${cleaningSummary.statusCounts.Deficiente} (${cleaningSummary.statusPercentages.Deficiente}%)
+    ${additionalInfo}
 
     El usuario te pregunta: "${userMessage}"
 
-    Responde de manera concisa y profesional basándote en el contenido del documento y tu análisis previo.
+    Responde de manera concisa y profesional basándote en el contenido del documento y toda la información disponible.
 
     Reglas:
     1. Si te piden información específica sobre un ítem:
        - Menciona su estado exacto (Excelente, Bueno, Regular, Deficiente)
        - Si el estado es "No Marcada" o "No Determinado", indícalo claramente
        - Incluye cualquier observación relevante asociada con ese ítem
-       - Si hay texto adicional como "CON POLVO DE DÍAS", menciónalo como parte de la observación
 
     2. Si te piden un resumen:
-       - Debe tener máximo 50 palabras
-       - Enfócate solo en los hallazgos más importantes
-       - Menciona solo los estados más críticos (Deficiente o Regular)
-       - Usa un formato conciso y directo
+       - Debe ser conciso y directo
+       - Menciona el estado general de limpieza: ${cleaningSummary.overallStatus}
+       - Destaca los elementos en estado crítico (Regular o Deficiente)
+       - Incluye las observaciones más importantes
 
-    3. Si te preguntan sobre casillas marcadas:
-       - Indica claramente qué casilla está marcada (E, B, R o D)
-       - Explica qué significa cada casilla: E (Excelente), B (Bueno), R (Regular), D (Deficiente)
-       - Si hay una observación asociada, menciónala
+    3. Si te preguntan sobre el estado general:
+       - Indica que el estado general es: ${cleaningSummary.overallStatus}
+       - Explica que se basa en el análisis de ${cleaningSummary.elementsCount} elementos
+       - Menciona los porcentajes de cada estado
 
-    4. IMPORTANTE: Usa la información disponible en el documento para responder de la manera más precisa posible.
+    4. IMPORTANTE: Usa toda la información disponible para responder de la manera más precisa posible.
 
     5. Si no encuentras información sobre algo específico:
-       - Indica claramente que no hay información disponible sobre ese tema en el documento
-       - No inventes información que no esté en el documento o en el análisis`;
+       - Indica claramente que no hay información disponible sobre ese tema
+       - No inventes información que no esté en los datos proporcionados`;
 
+    console.log('Enviando prompt mejorado a Gemini...');
     const result = await model.generateContent(prompt);
-    return result.response.text();
+    const responseText = result.response.text();
+
+    // Guardar en caché
+    cacheService.set(cacheKey, responseText, 1800); // 30 minutos
+
+    return responseText;
   } catch (error) {
     console.error('Error generando respuesta de chat:', error);
-    return 'Lo siento, no pude procesar tu pregunta en este momento.';
+
+    // Intentar con un prompt más simple como respaldo
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const simplePrompt = `Responde a esta pregunta sobre un documento de inspección de limpieza: "${userMessage}"
+
+      Basado en este análisis:
+      ${analysisResult}`;
+
+      const result = await model.generateContent(simplePrompt);
+      return result.response.text();
+    } catch (backupError) {
+      console.error('Error con el prompt de respaldo:', backupError);
+      return 'Lo siento, no pude procesar tu pregunta en este momento. Por favor, intenta de nuevo más tarde.';
+    }
   }
 }
 
