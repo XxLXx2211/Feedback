@@ -5,8 +5,9 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-// Controlador (lo crearemos después)
+// Controlador y middlewares
 const pdfController = require('../controllers/pdfController');
+const uploadLimiter = require('../middleware/uploadLimiter');
 
 // Configurar almacenamiento para multer
 const storage = multer.diskStorage({
@@ -46,11 +47,11 @@ const upload = multer({
 });
 
 // Rutas
-router.post('/upload', upload.single('file'), pdfController.uploadPDF);
+router.post('/upload', uploadLimiter, upload.single('file'), pdfController.uploadPDF);
 router.get('/documents', pdfController.getDocuments);
 router.get('/documents/:id', pdfController.getDocument);
 router.delete('/documents/:id', pdfController.deleteDocument);
-router.post('/analyze/:id', pdfController.analyzePDF);
+router.post('/analyze/:id', uploadLimiter, pdfController.analyzePDF);
 router.get('/view/:id', pdfController.viewPDF); // Ruta para ver el PDF sin descargar
 router.get('/analysis/:id', pdfController.getDocumentAnalysis); // Ruta para obtener el análisis detallado
 router.post('/chat/:id', pdfController.chatWithPDF); // Ruta para chatear con el PDF

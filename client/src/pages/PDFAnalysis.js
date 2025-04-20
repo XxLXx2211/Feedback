@@ -71,23 +71,38 @@ const PDFAnalysis = () => {
     console.log('Polling iniciado para documentos pendientes');
   };
 
+  // Estado para paginación
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    pageSize: 20,
+    totalDocuments: 0
+  });
+
   // Función para cargar documentos
-  const loadDocuments = async (showLoading = true) => {
+  const loadDocuments = async (showLoading = true, page = 1) => {
     try {
       if (showLoading) {
         setLoading(true);
       }
-      const response = await getDocuments();
+
+      // Obtener documentos con paginación
+      const response = await getDocuments({ page, limit: pagination.pageSize });
       console.log('Respuesta del servidor (documentos):', response);
+
+      // Actualizar información de paginación
+      if (response.pagination) {
+        setPagination(response.pagination);
+      }
 
       // Procesar la respuesta
       let newDocuments = [];
-      if (Array.isArray(response)) {
-        console.log(`Se recibieron ${response.length} documentos directamente`);
+      if (response.documents && Array.isArray(response.documents)) {
+        console.log(`Se recibieron ${response.documents.length} documentos (página ${response.pagination?.currentPage || 1} de ${response.pagination?.totalPages || 1})`);
+        newDocuments = response.documents;
+      } else if (Array.isArray(response)) {
+        console.log(`Se recibieron ${response.length} documentos directamente (formato antiguo)`);
         newDocuments = response;
-      } else if (response?.data && Array.isArray(response.data)) {
-        console.log(`Se recibieron ${response.data.length} documentos en response.data`);
-        newDocuments = response.data;
       } else {
         console.warn('Formato de respuesta inesperado:', response);
         newDocuments = [];
@@ -735,6 +750,34 @@ const PDFAnalysis = () => {
                       ))}
                     </tbody>
                   </Table>
+
+                  {/* Controles de paginación */}
+                  {pagination.totalPages > 1 && (
+                    <div className="pagination-controls d-flex justify-content-between align-items-center mt-3">
+                      <div className="pagination-info">
+                        Página {pagination.currentPage} de {pagination.totalPages} ({pagination.totalDocuments} documentos)
+                      </div>
+                      <div className="pagination-buttons">
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          disabled={!pagination.hasPrevPage}
+                          onClick={() => loadDocuments(true, pagination.currentPage - 1)}
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          className="ms-2"
+                          disabled={!pagination.hasNextPage}
+                          onClick={() => loadDocuments(true, pagination.currentPage + 1)}
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </Card.Body>

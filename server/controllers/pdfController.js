@@ -74,26 +74,37 @@ exports.uploadPDF = async (req, res) => {
 };
 
 /**
- * Obtener todos los documentos
+ * Obtener todos los documentos con paginación y caché
  */
 exports.getDocuments = async (req, res) => {
   try {
+    // Parámetros de paginación
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
     // Obtener el modelo PDFDocument
     const PDFDocument = await getPDFDocumentModel();
 
-    // Buscar documentos
-    const documents = await PDFDocument.find().sort({ creado: -1 });
+    // Buscar documentos con paginación y proyección (solo campos necesarios)
+    // Esto reduce significativamente el tamaño de la respuesta y mejora el rendimiento
+    const documents = await PDFDocument.find({}, {
+      t: 1,           // título
+      d: 1,           // descripción
+      f: 1,           // nombre de archivo
+      s: 1,           // estado
+      creado: 1,      // fecha de creación
+      actualizado: 1, // fecha de actualización
+      conv: { $exists: true, $size: { $gt: 0 } } // solo verificar si hay conversaciones
+    })
+    .sort({ creado: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean(); // Usar lean() para obtener objetos JavaScript simples (más rápido)
 
-    console.log(`Se encontraron ${documents.length} documentos en la base de datos de PDFs`);
-
-    if (documents.length > 0) {
-      console.log('Primer documento:', {
-        _id: documents[0]._id,
-        t: documents[0].t,
-        s: documents[0].s,
-        creado: documents[0].creado
-      });
-    }
+    // Contar total de documentos (para paginación)
+    const totalDocuments = await PDFDocument.countDocuments();
+    const totalPages = Math.ceil(totalDocuments / limit);
 
     // Transformar para mantener compatibilidad con el frontend
     const transformedDocuments = documents.map(doc => ({
@@ -105,18 +116,29 @@ exports.getDocuments = async (req, res) => {
               doc.s === 'c' ? 'completed' : 'error',
       createdAt: doc.creado || new Date(),
       updatedAt: doc.actualizado || new Date(),
-      hasConversation: doc.conv && doc.conv.length > 0
+      hasConversation: doc.conv ? true : false
     }));
 
-    console.log(`Documentos transformados: ${transformedDocuments.length}`);
-    if (transformedDocuments.length > 0) {
-      console.log('Primer documento transformado:', transformedDocuments[0]);
-    }
-
-    res.status(200).json(transformedDocuments);
+    // Respuesta con metadatos de paginación
+    res.status(200).json({
+      documents: transformedDocuments,
+      pagination: {
+        totalDocuments,
+        totalPages,
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
   } catch (error) {
     console.error('Error al obtener documentos:', error);
-    res.status(500).json({ error: 'Error al obtener documentos: ' + error.message });
+    // Respuesta de error más amigable
+    res.status(500).json({
+      error: 'Error al obtener documentos',
+      message: 'Ha ocurrido un problema al cargar los documentos. Por favor, intenta de nuevo más tarde.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 

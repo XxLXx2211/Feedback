@@ -70,12 +70,19 @@ export const uploadPDF = async (formData) => {
 };
 
 /**
- * Obtener todos los documentos
- * @returns {Promise<Array>} - Lista de documentos
+ * Obtener todos los documentos con paginación
+ * @param {Object} options - Opciones de paginación
+ * @param {number} options.page - Número de página (por defecto: 1)
+ * @param {number} options.limit - Límite de documentos por página (por defecto: 20)
+ * @returns {Promise<Object>} - Objeto con documentos y metadatos de paginación
  */
-export const getDocuments = async () => {
+export const getDocuments = async (options = {}) => {
   try {
     console.log('Solicitando lista de documentos...');
+
+    // Parámetros de paginación
+    const page = options.page || 1;
+    const limit = options.limit || 20;
 
     // Intentar con reintentos
     let retries = 3;
@@ -83,9 +90,10 @@ export const getDocuments = async () => {
 
     while (retries > 0) {
       try {
-        console.log('Obteniendo documentos PDF...');
+        console.log(`Obteniendo documentos PDF (página ${page}, límite ${limit})...`);
 
         const response = await API.get('/pdf/documents', {
+          params: { page, limit },
           // Configuración adicional para mejorar la estabilidad
           maxRedirects: 5,
           validateStatus: status => status >= 200 && status < 500 // Considerar errores 4xx como respuestas válidas
@@ -97,9 +105,41 @@ export const getDocuments = async () => {
           throw new Error('No se recibió respuesta del servidor');
         }
 
-        console.log(`Se recibieron ${Array.isArray(response.data) ? response.data.length : 0} documentos`);
-        console.log('Datos recibidos:', response.data);
-        return response.data;
+        // Verificar si la respuesta tiene el nuevo formato paginado
+        if (response.data.documents && response.data.pagination) {
+          console.log(`Se recibieron ${response.data.documents.length} documentos (página ${response.data.pagination.currentPage} de ${response.data.pagination.totalPages})`);
+          // Devolver la respuesta completa con documentos y metadatos de paginación
+          return response.data;
+        } else if (Array.isArray(response.data)) {
+          // Compatibilidad con el formato anterior (array de documentos)
+          console.log(`Se recibieron ${response.data.length} documentos (formato antiguo)`);
+          // Convertir al nuevo formato
+          return {
+            documents: response.data,
+            pagination: {
+              totalDocuments: response.data.length,
+              totalPages: 1,
+              currentPage: 1,
+              pageSize: response.data.length,
+              hasNextPage: false,
+              hasPrevPage: false
+            }
+          };
+        } else {
+          console.warn('Formato de respuesta inesperado:', response.data);
+          // Devolver un objeto vacío con el formato esperado
+          return {
+            documents: [],
+            pagination: {
+              totalDocuments: 0,
+              totalPages: 0,
+              currentPage: 1,
+              pageSize: limit,
+              hasNextPage: false,
+              hasPrevPage: false
+            }
+          };
+        }
       } catch (attemptError) {
         lastError = attemptError;
         retries--;
@@ -122,7 +162,7 @@ export const getDocuments = async () => {
 
     if (error.response) {
       // El servidor respondió con un código de error
-      errorMessage = error.response.data.error || `Error ${error.response.status}: ${error.response.statusText}`;
+      errorMessage = error.response.data.error || error.response.data.message || `Error ${error.response.status}: ${error.response.statusText}`;
     } else if (error.request) {
       // La solicitud se hizo pero no se recibió respuesta
       errorMessage = 'No se recibió respuesta del servidor. Intenta recargar la página.';
