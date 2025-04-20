@@ -195,7 +195,8 @@ setInterval(() => {
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();
   const memoryUsage = 1 - (freeMemory / totalMemory);
-  const isCurrentlyOverloaded = cpuUsage > 0.6 || memoryUsage > 0.7; // Umbrales más bajos para Railway: 60% CPU o 70% memoria
+  // Umbrales ajustados para Railway con 48 CPUs: 80% CPU normalizado o 85% memoria
+  const isCurrentlyOverloaded = (cpuUsage / os.cpus().length) > 0.8 || memoryUsage > 0.85;
 
   // Actualizar estado del sistema
   systemLoad = {
@@ -237,7 +238,8 @@ setInterval(() => {
       const currentCpuUsage = os.loadavg()[0];
       const currentMemoryUsage = 1 - (os.freemem() / os.totalmem());
 
-      if (currentCpuUsage > 0.8 || currentMemoryUsage > 0.85) {
+      // Verificar con los mismos umbrales ajustados
+      if ((currentCpuUsage / os.cpus().length) > 0.8 || currentMemoryUsage > 0.85) {
         console.log('Sistema aún sobrecargado, extendiendo pausa...');
         // Extender la pausa otros 30 segundos
         pauseTimeout = setTimeout(() => {
