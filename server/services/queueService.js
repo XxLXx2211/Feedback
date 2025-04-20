@@ -175,95 +175,38 @@ if (!isProduction || hasRedis) {
 // Configurar número de procesadores limitado para Railway
 const NUM_WORKERS = Math.min(2, os.cpus().length);
 console.log(`Configurando ${NUM_WORKERS} workers para procesamiento de PDFs (optimizado para Railway)`);
+console.log('Detección de sobrecarga desactivada - Usando límites de carga mejorados para evitar problemas');
 
-// Monitorear estado del sistema
+// Monitorear estado del sistema (solo para información, sin pausar colas)
 let systemLoad = {
   cpuUsage: 0,
   memoryUsage: 0,
-  isOverloaded: false,
+  freeMemoryMB: 0,
   lastCheck: Date.now()
 };
 
-// Variables para controlar la sobrecarga
-let pauseTimeout = null;
-let consecutiveOverloads = 0;
-let lastResumeTime = Date.now();
-
-// Verificar carga del sistema cada 15 segundos
+// Actualizar métricas del sistema cada 30 segundos (solo para monitoreo)
 setInterval(() => {
   const cpuUsage = os.loadavg()[0]; // Carga promedio de 1 minuto
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();
   const memoryUsage = 1 - (freeMemory / totalMemory);
-  // Umbrales ajustados para Railway: 80% CPU normalizado o 85% memoria o menos de 100MB libres
   const freeMemoryMB = Math.round(freeMemory / (1024 * 1024));
-  const isCurrentlyOverloaded = (cpuUsage / os.cpus().length) > 0.8 || memoryUsage > 0.85 || freeMemoryMB < 100;
+  const cpuCount = os.cpus().length;
+  const cpuLoadPercent = Math.round((cpuUsage / cpuCount) * 100);
 
-  // Actualizar estado del sistema
+  // Actualizar estado del sistema (solo para monitoreo)
   systemLoad = {
     cpuUsage,
     memoryUsage,
-    freeMemoryMB: Math.round(freeMemory / (1024 * 1024)),
-    isOverloaded: isCurrentlyOverloaded,
-    consecutiveOverloads: isCurrentlyOverloaded ? consecutiveOverloads + 1 : 0,
+    freeMemoryMB,
+    cpuLoadPercent,
     lastCheck: Date.now()
   };
 
-  // Actualizar contador de sobrecargas consecutivas
-  if (isCurrentlyOverloaded) {
-    consecutiveOverloads++;
-  } else {
-    consecutiveOverloads = 0;
-  }
-
-  // Si el sistema está sobrecargado, pausar temporalmente las colas
-  if (systemLoad.isOverloaded) {
-    // Limpiar cualquier timeout pendiente
-    if (pauseTimeout) {
-      clearTimeout(pauseTimeout);
-    }
-
-    // Calcular el porcentaje de CPU basado en la carga promedio y el número de CPUs
-    const cpuCount = os.cpus().length;
-    const cpuLoadPercent = Math.round((cpuUsage / cpuCount) * 100);
-    console.log(`Sistema sobrecargado (Carga: ${cpuUsage.toFixed(2)} (${cpuLoadPercent}% de ${cpuCount} CPUs), Memoria: ${Math.round(memoryUsage * 100)}% (${freeMemoryMB}MB libres)), pausando colas temporalmente`);
-    pdfProcessingQueue.pause();
-    pdfAnalysisQueue.pause();
-
-    // Calcular tiempo de pausa basado en sobrecargas consecutivas
-    const pauseTime = Math.min(30000 + (consecutiveOverloads * 5000), 120000); // Entre 30s y 2min
-
-    // Reanudar después del tiempo calculado
-    pauseTimeout = setTimeout(() => {
-      // Verificar nuevamente antes de reanudar
-      const currentCpuUsage = os.loadavg()[0];
-      const currentMemoryUsage = 1 - (os.freemem() / os.totalmem());
-
-      // Verificar con los mismos umbrales ajustados
-      const currentFreeMemoryMB = Math.round(os.freemem() / (1024 * 1024));
-      if ((currentCpuUsage / os.cpus().length) > 0.8 || currentMemoryUsage > 0.85 || currentFreeMemoryMB < 100) {
-        console.log('Sistema aún sobrecargado, extendiendo pausa...');
-        // Extender la pausa otros 30 segundos
-        pauseTimeout = setTimeout(() => {
-          pdfProcessingQueue.resume();
-          pdfAnalysisQueue.resume();
-          console.log('Colas reanudadas después de pausa extendida por sobrecarga');
-          lastResumeTime = Date.now();
-        }, 30000);
-      } else {
-        pdfProcessingQueue.resume();
-        pdfAnalysisQueue.resume();
-        console.log('Colas reanudadas después de pausa por sobrecarga');
-        lastResumeTime = Date.now();
-      }
-    }, pauseTime);
-  } else if (Date.now() - lastResumeTime > 300000) { // 5 minutos desde la última reanudación
-    // Asegurarse de que las colas estén activas si el sistema no está sobrecargado por un tiempo
-    pdfProcessingQueue.resume();
-    pdfAnalysisQueue.resume();
-    lastResumeTime = Date.now();
-  }
-}, 15000);
+  // Log informativo (sin pausar colas)
+  console.log(`Estado del sistema - CPU: ${cpuUsage.toFixed(2)} (${cpuLoadPercent}% de ${cpuCount} CPUs), Memoria: ${Math.round(memoryUsage * 100)}% (${freeMemoryMB}MB libres)`);
+}, 30000);
 
 // Procesar PDFs (extracción básica de texto)
 pdfProcessingQueue.process(NUM_WORKERS, async (job) => {
@@ -514,7 +457,12 @@ async function getQueuesStatus() {
   ]);
 
   return {
-    system: systemLoad,
+    system: {
+      ...systemLoad,
+      // Ya no hay detección de sobrecarga
+      isOverloaded: false,
+      pauseStatus: 'active'
+    },
     processing: {
       waiting: processingWaiting,
       active: processingActive,
