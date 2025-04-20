@@ -1,0 +1,305 @@
+.home-page {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-title {
+  color: var(--primary-color);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.page-description {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Estilos para los filtros */
+.filter-label {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  transition: color 0.2s ease;
+}
+
+.filter-icon {
+  margin-right: 0.5rem;
+  color: var(--primary-color);
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.form-select:focus + .filter-label .filter-icon,
+.form-select:hover + .filter-label .filter-icon {
+  transform: rotate(15deg);
+  color: var(--secondary-color);
+}
+
+.form-select {
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 1rem;
+  transition: all 0.2s ease;
+  background-color: var(--card-bg);
+  color: var(--text-color);
+}
+
+.form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(var(--primary-color-rgb), 0.25);
+}
+
+/* Estilos para la tabla de ranking */
+.ranking-table {
+  margin-top: 1rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.ranking-table thead th {
+  background-color: var(--container-bg);
+  color: var(--text-color);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-color);
+  padding: 0.75rem 1rem;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+.ranking-table tbody tr {
+  transition: all 0.2s ease;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ranking-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.ranking-table tbody tr:hover {
+  background-color: var(--container-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.ranking-table .top-three {
+  background-color: rgba(var(--primary-color-rgb), 0.05);
+}
+
+.ranking-table td {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+}
+
+.ranking-table th:first-child,
+.ranking-table td:first-child {
+  padding-left: 1.5rem;
+}
+
+.ranking-table th:last-child,
+.ranking-table td:last-child {
+  padding-right: 1.5rem;
+}
+
+/* Estilos para tema oscuro */
+[data-theme='dark'] .ranking-table {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background-color: #1e293b;
+}
+
+[data-theme='dark'] .ranking-table thead th {
+  background-color: #1a1f2e;
+  color: #e2e8f0;
+  border-bottom-color: #334155;
+}
+
+[data-theme='dark'] .ranking-table tbody tr {
+  border-bottom-color: #334155;
+}
+
+[data-theme='dark'] .ranking-table tbody tr:hover {
+  background-color: #2d3748;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='dark'] .ranking-table .top-three {
+  background-color: rgba(79, 70, 229, 0.1);
+}
+
+[data-theme='dark'] .ranking-table tbody tr.top-three:hover {
+  background-color: rgba(79, 70, 229, 0.15);
+}
+
+/* Estilos para las medallas */
+.position-cell {
+  position: relative;
+  text-align: center;
+}
+
+.medal {
+  font-size: 1.5rem;
+  margin-right: 0.25rem;
+  color: #6c757d;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.medal.gold {
+  color: #ffc107;
+  filter: drop-shadow(0 0 3px rgba(255, 193, 7, 0.3));
+}
+
+.medal.silver {
+  color: #adb5bd;
+  filter: drop-shadow(0 0 3px rgba(173, 181, 189, 0.3));
+}
+
+.medal.bronze {
+  color: #cd7f32;
+  filter: drop-shadow(0 0 3px rgba(205, 127, 50, 0.3));
+}
+
+.ranking-table tr:hover .medal {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.ranking-table tr:hover .medal.gold {
+  filter: drop-shadow(0 0 5px rgba(255, 193, 7, 0.5));
+}
+
+.ranking-table tr:hover .medal.silver {
+  filter: drop-shadow(0 0 5px rgba(173, 181, 189, 0.5));
+}
+
+.ranking-table tr:hover .medal.bronze {
+  filter: drop-shadow(0 0 5px rgba(205, 127, 50, 0.5));
+}
+
+.position-number {
+  font-weight: 700;
+  font-size: 1.1rem;
+  display: block;
+}
+
+.employee-name {
+  font-weight: 600;
+  color: var(--primary-color);
+  transition: color 0.2s ease;
+  display: inline-block;
+}
+
+.ranking-table tr:hover .employee-name {
+  color: var(--secondary-color);
+}
+
+.company-badge {
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+  font-size: 0.85em;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.ranking-table tr:hover .company-badge {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Estilos para la barra de puntuación */
+.score-container {
+  position: relative;
+  height: 24px;
+  background-color: var(--container-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.score-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 12px;
+  transition: width 0.5s ease, background 0.5s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Colores de la barra según la puntuación */
+.score-bar {
+  background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+}
+
+.score-bar.score-red {
+  background: linear-gradient(to right, #ef4444, #dc2626);
+}
+
+.score-bar.score-yellow {
+  background: linear-gradient(to right, #f59e0b, #d97706);
+}
+
+.score-bar.score-green {
+  background: linear-gradient(to right, #10b981, #059669);
+}
+
+.score-text-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.score-text {
+  color: white !important;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+  font-size: 0.9rem;
+  background-color: transparent !important;
+}
+
+/* Estilos para tema oscuro */
+[data-theme='dark'] .score-container {
+  background-color: #1a202c;
+}
+
+[data-theme='dark'] .score-bar {
+  background-color: #3b82f6;
+}
+
+[data-theme='dark'] .employee-name {
+  color: #60a5fa;
+}
+
+[data-theme='dark'] .company-badge {
+  background-color: #3b82f6 !important;
+}
+
+/* Estilos para el sidebar */
+.sidebar-link span {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.sidebar-link.active span {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.sidebar-icon {
+  color: #ffffff;
+  font-size: 1.2rem;
+  margin-right: 0.75rem;
+}

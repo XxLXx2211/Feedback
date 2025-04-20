@@ -1,0 +1,16 @@
+[
+  {
+    "_id": "60d21b4667d0d8992e610c85",
+    "n": "Empresa A",
+    "ubicacion": "Calle Principal 123",
+    "creado": "2025-04-05T20:59:32.331Z",
+    "actualizado": "2025-04-05T20:59:32.331Z"
+  },
+  {
+    "_id": "60d21b4667d0d8992e610c86",
+    "n": "Empresa B",
+    "ubicacion": "Avenida Central 456",
+    "creado": "2025-04-05T20:59:32.331Z",
+    "actualizado": "2025-04-05T20:59:32.331Z"
+  }
+]

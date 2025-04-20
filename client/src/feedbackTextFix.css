@@ -1,0 +1,147 @@
+/* Correcciones específicas para la página de Feedback */
+
+/* Tema claro */
+.feedback-page .table td,
+.feedback-page .table th {
+  color: #333333 !important;
+}
+
+.feedback-page .fw-bold {
+  color: #333333 !important;
+}
+
+.feedback-page .text-muted {
+  color: #6c757d !important;
+}
+
+/* Tema oscuro */
+[data-theme='dark'] .feedback-page .table td,
+[data-theme='dark'] .feedback-page .table th {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .feedback-page .fw-bold {
+  color: #f0f0f0 !important;
+}
+
+[data-theme='dark'] .feedback-page .text-muted {
+  color: #9ca3af !important;
+}
+
+/* Correcciones para badges */
+.feedback-page .badge {
+  color: white !important;
+}
+
+.feedback-page .badge.bg-success {
+  background-color: #28a745 !important;
+}
+
+.feedback-page .badge.bg-warning {
+  background-color: #ffc107 !important;
+  color: #212529 !important;
+}
+
+[data-theme='dark'] .feedback-page .badge.bg-success {
+  background-color: #10b981 !important;
+}
+
+[data-theme='dark'] .feedback-page .badge.bg-warning {
+  background-color: #f59e0b !important;
+  color: #f0f0f0 !important;
+}
+
+/* Correcciones para botones de acción */
+.feedback-page .btn-info,
+.feedback-page .btn-primary,
+.feedback-page .btn-success,
+.feedback-page .btn-danger {
+  color: white !important;
+}
+
+/* Correcciones para títulos y textos específicos */
+.feedback-page .page-title {
+  color: var(--primary-color) !important;
+}
+
+[data-theme='dark'] .feedback-page .page-title {
+  color: #f0f0f0 !important;
+}
+
+.feedback-page .page-description {
+  color: var(--text-muted) !important;
+}
+
+[data-theme='dark'] .feedback-page .page-description {
+  color: #9ca3af !important;
+}
+
+/* Correcciones para el texto de "No hay feedbacks disponibles" */
+.feedback-page .text-center .text-muted {
+  color: #6c757d !important;
+}
+
+[data-theme='dark'] .feedback-page .text-center .text-muted {
+  color: #9ca3af !important;
+}
+
+/* Correcciones para las alertas */
+.feedback-page .alert-success {
+  color: #155724 !important;
+}
+
+.feedback-page .alert-danger {
+  color: #721c24 !important;
+}
+
+[data-theme='dark'] .feedback-page .alert-success {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  color: #6ee7b7 !important;
+}
+
+[data-theme='dark'] .feedback-page .alert-danger {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #fca5a5 !important;
+}
+
+/* Correcciones para el texto de la tabla */
+.feedback-page table tbody tr td,
+.feedback-table tbody tr td {
+  color: #333333 !important;
+}
+
+[data-theme='dark'] .feedback-page table tbody tr td,
+[data-theme='dark'] .feedback-table tbody tr td {
+  color: #f0f0f0 !important;
+}
+
+/* Correcciones para el encabezado de la tabla */
+.feedback-page table thead tr th,
+.feedback-table thead tr th {
+  color: #333333 !important;
+}
+
+[data-theme='dark'] .feedback-page table thead tr th,
+[data-theme='dark'] .feedback-table thead tr th {
+  color: #f0f0f0 !important;
+}
+
+/* Correcciones para el texto de la puntuación */
+.feedback-page .fw-bold {
+  color: #333333 !important;
+}
+
+[data-theme='dark'] .feedback-page .fw-bold {
+  color: #f0f0f0 !important;
+}
+
+/* Correcciones para el texto de N/A */
+.feedback-page .text-muted {
+  color: #6c757d !important;
+}
+
+[data-theme='dark'] .feedback-page .text-muted {
+  color: #9ca3af !important;
+}

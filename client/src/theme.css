@@ -1,0 +1,263 @@
+/* Variables de color para el tema claro */
+:root {
+  --primary-color: #3b82f6;
+  --primary-color-rgb: 59, 130, 246;
+  --secondary-color: #2563eb;
+  --background-color: #f8fafc;
+  --text-color: #333333;
+  --text-muted: #6c757d;
+  --border-color: #e5e7eb;
+  --container-bg: #f1f5f9;
+  --card-bg: #ffffff;
+}
+
+/* Asegurar que todos los textos sean oscuros */
+body, p, span, div, h1, h2, h3, h4, h5, h6, label, .form-label, .form-check-label {
+  color: #333333;
+}
+
+/* Asegurar que las tablas tengan texto oscuro */
+.table, .table th, .table td {
+  color: #333333 !important;
+}
+
+/* Correcciones para tarjetas en tema oscuro */
+[data-theme='dark'] .card {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+[data-theme='dark'] .card-header {
+  background-color: #2d3748;
+  border-bottom-color: #4a5568;
+}
+
+[data-theme='dark'] .card-footer {
+  background-color: #2d3748;
+  border-top-color: #4a5568;
+}
+
+/* Correcciones para formularios en tema oscuro */
+[data-theme='dark'] .form-control {
+  background-color: #1a202c;
+  border-color: #4a5568;
+  color: #f0f0f0;
+}
+
+[data-theme='dark'] .form-control:focus {
+  background-color: #2d3748;
+  border-color: #3b82f6;
+  color: #f0f0f0;
+}
+
+[data-theme='dark'] .form-select {
+  background-color: #1a202c;
+  border-color: #4a5568;
+  color: #f0f0f0;
+}
+
+[data-theme='dark'] .form-select:focus {
+  background-color: #2d3748;
+  border-color: #3b82f6;
+  color: #f0f0f0;
+}
+
+/* Correcciones para botones en tema oscuro */
+[data-theme='dark'] .btn-outline-primary {
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+[data-theme='dark'] .btn-outline-primary:hover {
+  background-color: #3b82f6;
+  color: #f0f0f0;
+}
+
+/* Correcciones para la barra de puntuación en tema oscuro */
+[data-theme='dark'] .score-container {
+  background-color: #1a202c;
+}
+
+[data-theme='dark'] .score-text {
+  color: #f0f0f0;
+}
+
+/* Correcciones para las medallas en tema oscuro */
+[data-theme='dark'] .medal {
+  color: #9ca3af;
+}
+
+[data-theme='dark'] .medal.gold {
+  color: #fbbf24;
+}
+
+[data-theme='dark'] .medal.silver {
+  color: #d1d5db;
+}
+
+[data-theme='dark'] .medal.bronze {
+  color: #d97706;
+}
+
+/* Correcciones para los badges en tema oscuro */
+[data-theme='dark'] .badge {
+  background-color: #4b5563;
+}
+
+[data-theme='dark'] .badge.bg-primary {
+  background-color: #3b82f6 !important;
+}
+
+[data-theme='dark'] .badge.bg-success {
+  background-color: #10b981 !important;
+}
+
+[data-theme='dark'] .badge.bg-info {
+  background-color: #3b82f6 !important;
+}
+
+[data-theme='dark'] .badge.bg-warning {
+  background-color: #f59e0b !important;
+}
+
+[data-theme='dark'] .badge.bg-danger {
+  background-color: #ef4444 !important;
+}
+
+/* Correcciones para los modales en tema oscuro */
+[data-theme='dark'] .modal-content {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+[data-theme='dark'] .modal-header {
+  border-bottom-color: #4a5568;
+}
+
+[data-theme='dark'] .modal-footer {
+  border-top-color: #4a5568;
+}
+
+/* Correcciones para los alerts en tema oscuro */
+[data-theme='dark'] .alert {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+[data-theme='dark'] .alert-info {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+}
+
+[data-theme='dark'] .alert-success {
+  background-color: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+[data-theme='dark'] .alert-warning {
+  background-color: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .alert-danger {
+  background-color: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+/* Correcciones para los textos en tema oscuro */
+[data-theme='dark'] .text-muted {
+  color: #9ca3af !important;
+}
+
+[data-theme='dark'] .text-primary {
+  color: #3b82f6 !important;
+}
+
+[data-theme='dark'] .text-success {
+  color: #10b981 !important;
+}
+
+[data-theme='dark'] .text-info {
+  color: #3b82f6 !important;
+}
+
+[data-theme='dark'] .text-warning {
+  color: #f59e0b !important;
+}
+
+[data-theme='dark'] .text-danger {
+  color: #ef4444 !important;
+}
+
+/* Correcciones para los enlaces en tema oscuro */
+[data-theme='dark'] a {
+  color: #3b82f6;
+}
+
+[data-theme='dark'] a:hover {
+  color: #60a5fa;
+}
+
+/* Correcciones para los inputs en tema oscuro */
+[data-theme='dark'] input::placeholder {
+  color: #6b7280;
+}
+
+/* Correcciones para los dropdowns en tema oscuro */
+[data-theme='dark'] .dropdown-menu {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+[data-theme='dark'] .dropdown-item {
+  color: #f0f0f0;
+}
+
+[data-theme='dark'] .dropdown-item:hover {
+  background-color: #4a5568;
+  color: #f0f0f0;
+}
+
+[data-theme='dark'] .dropdown-divider {
+  border-top-color: #4a5568;
+}
+
+/* Correcciones para los tooltips en tema oscuro */
+[data-theme='dark'] .tooltip .tooltip-inner {
+  background-color: #1a202c;
+  color: #f0f0f0;
+}
+
+/* Correcciones para los popovers en tema oscuro */
+[data-theme='dark'] .popover {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+[data-theme='dark'] .popover-header {
+  background-color: #374151;
+  border-bottom-color: #4a5568;
+}
+
+[data-theme='dark'] .popover-body {
+  color: #f0f0f0;
+}
+
+/* Correcciones para los spinners en tema oscuro */
+[data-theme='dark'] .spinner-border,
+[data-theme='dark'] .spinner-grow {
+  color: #3b82f6;
+}
+
+/* Correcciones para los progress bars en tema oscuro */
+[data-theme='dark'] .progress {
+  background-color: #1a202c;
+}
+
+[data-theme='dark'] .progress-bar {
+  background-color: #3b82f6;
+}
