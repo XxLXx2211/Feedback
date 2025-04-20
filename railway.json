@@ -5,7 +5,7 @@
     "buildCommand": "cd server && npm install --production"
   },
   "deploy": {
-    "startCommand": "cd server && node app.js",
+    "startCommand": "node server/app.js",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",

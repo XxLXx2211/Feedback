@@ -8,7 +8,9 @@ COPY server/package*.json ./server/
 
 # Instalar dependencias con --legacy-peer-deps para evitar problemas de compatibilidad
 RUN npm install --production --legacy-peer-deps
-RUN cd server && npm install --production --legacy-peer-deps
+WORKDIR /app/server
+RUN npm install --production --legacy-peer-deps
+WORKDIR /app
 
 # Copiar el resto de archivos
 COPY . .
