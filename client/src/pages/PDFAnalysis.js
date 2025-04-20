@@ -1044,7 +1044,7 @@ const PDFAnalysis = () => {
                                     <FaServer size="14" />
                                   </Button>
                                 </>
-                              )
+                              )}
                             </div>
                           </td>
                           <td>{new Date(doc.createdAt).toLocaleDateString()}</td>
