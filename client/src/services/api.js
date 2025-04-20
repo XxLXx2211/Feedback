@@ -12,7 +12,15 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 console.log('Usando URL de API hardcodeada:', API_URL);
 
 // Intentar hacer una solicitud de prueba para verificar la conexión
-fetch(API_URL.replace('/api', '') + '/api/status')
+// Construir la URL correctamente para evitar problemas con la ruta /api
+let testUrl = API_URL;
+if (testUrl.endsWith('/api')) {
+  testUrl = testUrl.substring(0, testUrl.length - 4);
+}
+testUrl += '/api/status';
+
+console.log('URL de prueba para verificar conexión:', testUrl);
+fetch(testUrl)
   .then(response => {
     console.log('Respuesta de prueba del servidor:', response.status);
     return response.json();
