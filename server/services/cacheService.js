@@ -29,15 +29,49 @@ let cacheStats = {
   lastReset: Date.now()
 };
 
+// Registro de accesos recientes para evitar logs repetitivos
+const recentAccesses = {};
+const LOG_THROTTLE_MS = 5000; // 5 segundos entre logs para la misma clave
+
 /**
  * Obtener un valor de la caché
  * @param {string} key - Clave para buscar en caché
+ * @param {boolean} silent - Si es true, no muestra mensajes de log
+ * @param {boolean} noRefreshFlag - Si es true, no añade el flag _fromCache
  * @returns {any|null} - Valor almacenado o null si no existe
  */
-const get = (key) => {
+const get = (key, silent = false, noRefreshFlag = false) => {
   const value = cache.get(key);
   if (value !== undefined) {
     cacheStats.hits++;
+
+    // Controlar logs repetitivos
+    const now = Date.now();
+    const lastLog = recentAccesses[key] || 0;
+
+    if (!silent && (now - lastLog > LOG_THROTTLE_MS)) {
+      // Limitar los logs para evitar spam en la consola
+      if (key.includes('page') && recentAccesses[key]) {
+        // No mostrar logs repetitivos para páginas
+      } else {
+        console.log(`Usando valor en caché para: ${key}`);
+      }
+      recentAccesses[key] = now;
+    }
+
+    // Añadir timestamp para saber cuándo se obtuvo de caché
+    if (!noRefreshFlag && typeof value === 'object' && value !== null) {
+      // Crear una copia para no modificar el objeto en caché
+      const result = { ...value };
+      // Añadir flag solo si no existe ya
+      if (!result._fromCache) {
+        result._fromCache = true;
+        result._cachedAt = now;
+        result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
+      }
+      return result;
+    }
+
     return value;
   }
   cacheStats.misses++;
@@ -174,17 +208,61 @@ const shouldThrottle = (key, minInterval = 1000, countSaved = true) => {
  * @param {Object} options - Opciones adicionales
  * @param {number} options.minInterval - Intervalo mínimo entre solicitudes en ms
  * @param {boolean} options.forceRefresh - Forzar actualización ignorando throttling
+ * @param {boolean} options.backgroundRefresh - Actualizar en segundo plano sin bloquear respuesta
  * @returns {Promise<any>} - Datos obtenidos
  */
 const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
-  const { minInterval = 5000, forceRefresh = false } = options;
+  const {
+    minInterval = 5000,
+    forceRefresh = false,
+    backgroundRefresh = false,
+    maxAge = 60000 // 1 minuto por defecto
+  } = options;
 
   // Intentar obtener de caché primero
-  const cachedValue = get(key);
+  const cachedValue = get(key, false, true); // No añadir flag _fromCache aún
+  const now = Date.now();
 
-  // Si hay valor en caché y no se fuerza actualización, devolverlo
-  if (cachedValue !== null && !forceRefresh) {
+  // Verificar si el valor en caché es demasiado viejo
+  const isCacheStale = cachedValue && cachedValue._timestamp &&
+                      (now - cachedValue._timestamp > maxAge);
+
+  // Si hay valor en caché y no está obsoleto y no se fuerza actualización
+  if (cachedValue !== null && !forceRefresh && !isCacheStale) {
+    // Añadir flag _fromCache manualmente
+    if (typeof cachedValue === 'object' && cachedValue !== null) {
+      cachedValue._fromCache = true;
+      cachedValue._cachedAt = now;
+      cachedValue._cacheAge = Math.round((now - (cachedValue._timestamp || now)) / 1000);
+    }
     return cachedValue;
+  }
+
+  // Si hay valor en caché pero está obsoleto, actualizar en segundo plano
+  if (cachedValue !== null && isCacheStale && backgroundRefresh) {
+    // Devolver el valor en caché inmediatamente
+    const result = { ...cachedValue };
+    result._fromCache = true;
+    result._cachedAt = now;
+    result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
+    result._refreshing = true;
+
+    // Actualizar en segundo plano
+    setTimeout(async () => {
+      try {
+        console.log(`Actualizando datos en segundo plano para ${key}`);
+        const freshData = await fetchFunction();
+        if (freshData) {
+          freshData._timestamp = Date.now();
+          set(key, freshData, ttl);
+          set(`last_valid_${key}`, freshData, 86400); // 24 horas
+        }
+      } catch (bgError) {
+        console.error(`Error en actualización en segundo plano para ${key}:`, bgError);
+      }
+    }, 100);
+
+    return result;
   }
 
   // Verificar si debemos throttlear esta solicitud
@@ -192,7 +270,12 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
     // Si hay valor en caché, devolverlo aunque esté throttled
     if (cachedValue !== null) {
       console.log(`Solicitud throttled para ${key}, usando caché existente`);
-      return cachedValue;
+      const result = { ...cachedValue };
+      result._fromCache = true;
+      result._cachedAt = now;
+      result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
+      result._throttled = true;
+      return result;
     }
 
     // Si no hay valor en caché, esperar un poco y continuar
@@ -207,6 +290,10 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
 
     // Almacenar en caché solo si hay datos válidos
     if (freshData) {
+      // Añadir timestamp para saber cuándo se obtuvo
+      if (typeof freshData === 'object' && freshData !== null) {
+        freshData._timestamp = Date.now();
+      }
       set(key, freshData, ttl);
       // Guardar una copia como último valor conocido válido
       set(`last_valid_${key}`, freshData, 86400); // 24 horas
@@ -219,14 +306,24 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
     // 1. Intentar usar el valor en caché actual si existe
     if (cachedValue !== null) {
       console.log(`Usando caché existente después de error para ${key}`);
-      return cachedValue;
+      const result = { ...cachedValue };
+      result._fromCache = true;
+      result._cachedAt = now;
+      result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
+      result._error = true;
+      return result;
     }
 
     // 2. Intentar usar el último valor válido conocido
-    const lastValidValue = get(`last_valid_${key}`);
+    const lastValidValue = get(`last_valid_${key}`, true, true);
     if (lastValidValue !== null) {
       console.log(`Usando último valor válido conocido para ${key}`);
-      return lastValidValue;
+      const result = { ...lastValidValue };
+      result._fromCache = true;
+      result._cachedAt = now;
+      result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
+      result._fallback = true;
+      return result;
     }
 
     // 3. Si es un error de MongoDB relacionado con operadores $, intentar con una consulta más simple
@@ -240,10 +337,16 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
 
       // Devolver un objeto vacío o array vacío dependiendo del contexto
       if (key.includes('document') || key.includes('pdf')) {
-        return { documents: [], pagination: { totalDocuments: 0, totalPages: 1, currentPage: 1, pageSize: 20 } };
+        return {
+          documents: [],
+          pagination: { totalDocuments: 0, totalPages: 1, currentPage: 1, pageSize: 20 },
+          _error: true,
+          _errorType: 'mongodb',
+          _timestamp: now
+        };
       }
 
-      return Array.isArray(cachedValue) ? [] : {};
+      return Array.isArray(cachedValue) ? [] : { _error: true, _timestamp: now };
     }
 
     // 4. Si todo lo demás falla, lanzar el error
