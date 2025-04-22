@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const { analyzePDF } = require('../services/pdfService');
 const { analyzeWithGemini, generateChatResponse } = require('../services/aiService');
-const cacheService = require('../services/cacheService');
 const cleaningStatusService = require('../services/cleaningStatusService');
 
 // Importar modelo para documentos PDF

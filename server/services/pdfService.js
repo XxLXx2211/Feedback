@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
 const { promisify } = require('util');
-const cacheService = require('./cacheService');
 
 // Promisificar operaciones de archivos para mejor manejo asíncrono
 const readFileAsync = promisify(fs.readFile);
@@ -27,16 +26,9 @@ async function processPDF(filePath, options = {}) {
   try {
     console.log(`Procesando archivo PDF: ${filePath}`);
 
-    // Usar caché si está habilitado y no se ha forzado un reprocesamiento
-    if (!options.forceReprocess) {
-      const cacheKey = `pdf_processed_${path.basename(filePath)}_${fs.statSync(filePath).size}`;
-      const cachedResult = cacheService.get(cacheKey);
-
-      if (cachedResult) {
-        console.log(`Usando resultado en caché para ${filePath}`);
-        return cachedResult;
-      }
-    }
+    // Ya no usamos caché, siempre procesamos el archivo
+    console.log(`Procesando archivo sin caché: ${filePath}`);
+    // No hay caché, siempre procesamos el archivo directamente
 
     // Verificar que el archivo existe usando promesas
     const fileExists = await existsAsync(filePath);
@@ -117,13 +109,9 @@ async function processPDF(filePath, options = {}) {
         processedResult.enhancedText = processedResult.text;
       }
 
-      // Guardar en caché para futuras solicitudes
-      if (!options.skipCache) {
-        const cacheKey = `pdf_processed_${path.basename(filePath)}_${fs.statSync(filePath).size}`;
-        const cacheTTL = isLargeFile ? 7200 : 3600; // 2 horas para archivos grandes, 1 hora para el resto (mayor TTL para Railway)
-        cacheService.set(cacheKey, processedResult, cacheTTL);
-        console.log(`Resultado guardado en caché con TTL de ${cacheTTL} segundos`);
-      }
+      // Ya no guardamos en caché, siempre usamos resultados frescos
+      console.log(`Procesamiento completado para ${filePath}`);
+      // Los resultados se guardan directamente en MongoDB
 
       return processedResult;
     } else if (result.status === 'processing') {

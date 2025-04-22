@@ -3,8 +3,6 @@
  * Versión mejorada con algoritmos avanzados de detección
  */
 
-const cacheService = require('./cacheService');
-
 // Elementos comunes en formularios de inspección de limpieza
 const CLEANING_ELEMENTS = [
   'Techos', 'Sobretechos', 'Bajo Silos', 'Sobre Silos', 'Azoteas', 'Tuberías',
@@ -323,8 +321,8 @@ function analyzeCleaningStatus(text, forceRefresh = false) {
     }
   }
 
-  // Guardar en caché para futuras solicitudes
-  cacheService.set(cacheKey, elements, 3600); // 1 hora de caché
+  // Ya no guardamos en caché, siempre usamos resultados frescos
+  console.log(`Se encontraron ${elements.length} elementos de limpieza`);
 
   return elements;
 }
