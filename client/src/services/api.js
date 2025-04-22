@@ -4,12 +4,24 @@ import axios from 'axios';
 // Usar la IP del host actual en lugar de localhost para evitar problemas de CORS
 const hostname = window.location.hostname;
 
-// Definir la URL de la API directamente para evitar problemas
-// Usar la URL local para desarrollo
-const API_URL = 'http://localhost:5000/api';
+// Definir la URL de la API basada en el entorno
+let API_URL;
 
-// Imprimir la URL para depuración
-console.log('Usando URL de API hardcodeada:', API_URL);
+// Usar la variable de entorno REACT_APP_API_URL si está definida
+if (process.env.REACT_APP_API_URL) {
+  API_URL = process.env.REACT_APP_API_URL;
+  console.log('Usando URL de API desde variable de entorno:', API_URL);
+} else if (process.env.NODE_ENV === 'production') {
+  // URL del backend en Railway para producción
+  API_URL = 'https://sermalite-feedback-production.up.railway.app/api';
+  console.log('Usando URL de API de producción hardcodeada:', API_URL);
+} else {
+  // URL local para desarrollo
+  API_URL = 'http://localhost:5000/api';
+  console.log('Usando URL de API local para desarrollo:', API_URL);
+}
+
+// Ya imprimimos la URL en las condiciones anteriores
 
 // Intentar hacer una solicitud de prueba para verificar la conexión
 fetch(API_URL.replace('/api', '') + '/api/status')
