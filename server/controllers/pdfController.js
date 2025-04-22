@@ -397,8 +397,12 @@ exports.deleteDocument = async (req, res) => {
   }
 };
 
+// Versión actual del algoritmo de análisis
+// Incrementar esta versión cuando se mejore significativamente el algoritmo
+const CURRENT_ANALYSIS_VERSION = 1;
+
 /**
- * Analizar un PDF con carga rápida y caché mejorada
+ * Analizar un PDF usando exclusivamente MongoDB para almacenamiento
  */
 exports.analyzePDF = async (req, res) => {
   try {
@@ -408,221 +412,209 @@ exports.analyzePDF = async (req, res) => {
     // Registrar la solicitud para depuración
     console.log(`Solicitud de análisis para documento ${id}${forceRefresh ? ' (forzando recarga)' : ''}`);
 
-    // Usar caché para respuesta inmediata
-    const cacheKey = `analysis_${id}`;
+    // Obtener el modelo PDFDocument directamente
+    const PDFDocument = await getPDFDocumentModel();
 
-    // Si se fuerza la recarga, invalidar la caché primero
-    if (forceRefresh) {
-      console.log(`Invalidando caché para ${cacheKey} debido a forzar recarga`);
-      cacheService.del(cacheKey);
+    // Buscar el documento con proyección optimizada
+    const document = await PDFDocument.findById(id, {
+      s: 1,  // estado
+      g: 1,  // análisis de Gemini
+      a: 1,  // análisis estructurado
+      tx: 1, // texto extraído
+      t: 1,  // título
+      processingStarted: 1, // para verificar tiempo de procesamiento
+      processingCompleted: 1, // para verificar si el procesamiento está completo
+      analysisVersion: 1, // versión del algoritmo de análisis
+      creado: 1, // fecha de creación
+      actualizado: 1 // fecha de actualización
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: 'Documento no encontrado' });
     }
 
-    // Usar getOrSet con actualización en segundo plano para el análisis
-    const analysisResult = await cacheService.getOrSet(cacheKey, async () => {
-      // Obtener el modelo PDFDocument
-      const PDFDocument = await getPDFDocumentModel();
+    // Verificar si necesitamos regenerar el análisis
+    const needsRefresh = forceRefresh ||
+                        !document.g ||
+                        !document.a ||
+                        document.s !== 'c';
 
-      // Buscar el documento con proyección optimizada
-      const document = await PDFDocument.findById(id, {
-        s: 1,  // estado
-        g: 1,  // análisis de Gemini
-        a: 1,  // análisis estructurado
-        tx: 1, // texto extraído
-        processingStarted: 1, // para verificar tiempo de procesamiento
-        processingCompleted: 1 // para verificar si el procesamiento está completo
+    if (!needsRefresh) {
+      // Si no necesitamos regenerar, devolver el análisis almacenado
+      console.log(`Usando análisis almacenado para documento ${id}`);
+
+      // Intentar parsear el análisis estructurado
+      let structuredAnalysis = {};
+      try {
+        if (document.a && document.a.length > 0) {
+          structuredAnalysis = JSON.parse(document.a);
+        }
+      } catch (parseError) {
+        console.error('Error al parsear análisis:', parseError);
+      }
+
+      return res.status(200).json({
+        documentId: document._id,
+        title: document.t,
+        status: document.s,
+        analysis: document.g || '',
+        elements: structuredAnalysis.elements || [],
+        summary: structuredAnalysis.summary || {},
+        source: 'stored',
+        _timestamp: Date.now()
       });
+    }
 
-      if (!document) {
-        throw new Error('Documento no encontrado');
+    // Si llegamos aquí, necesitamos regenerar el análisis
+    console.log(`Regenerando análisis para documento ${id}...`);
+
+    // Verificar si el documento está en proceso de análisis
+    if (document.s === 'p') { // 'p' = procesando
+      // Verificar cuánto tiempo lleva procesando
+      const processingTime = document.processingStarted ? Date.now() - document.processingStarted : 0;
+
+      // Si lleva más de 2 minutos, intentar reprocesar
+      if (processingTime > 120000) { // 2 minutos
+        console.log(`Documento ${id} en procesamiento por ${Math.round(processingTime/1000)}s, iniciando reprocesamiento`);
+
+        // Iniciar procesamiento rápido en segundo plano
+        setImmediate(() => {
+          processDocumentFast(id);
+        });
+
+        return res.status(202).json({
+          analysis: 'El documento está siendo procesado nuevamente. Intente en 10-15 segundos.',
+          status: 'reprocessing',
+          formattedAnalysis: true,
+          estimatedTime: '10-15 segundos',
+          _timestamp: Date.now()
+        });
       }
 
-      // Verificar si el documento ya ha sido procesado
-      if (document.s === 'c') { // 'c' = completado/procesado
-        let analysisResponse = null;
+      // Si no ha pasado mucho tiempo, informar que está en proceso
+      return res.status(202).json({
+        analysis: 'El documento está siendo procesado. Intente nuevamente en 5-10 segundos.',
+        status: 'processing',
+        formattedAnalysis: true,
+        estimatedTime: '5-10 segundos',
+        _timestamp: Date.now()
+      });
+    }
 
-        // Si ya tiene análisis de Gemini, usarlo
-        if (document.g) {
-          analysisResponse = {
-            analysis: document.g,
-            formattedAnalysis: true,
-            source: 'gemini'
-          };
-        }
-        // Si tiene análisis estructurado, intentar usarlo
-        else if (document.a) {
-          try {
-            // Intentar parsear el análisis estructurado
-            const structuredAnalysis = JSON.parse(document.a);
+    // Si el documento está pendiente o en error, iniciar procesamiento
+    if (document.s === 'pending' || document.s === 'e') {
+      console.log(`Iniciando procesamiento para documento ${id} (estado: ${document.s})`);
 
-            // Si tenemos elementos y resumen
-            if (structuredAnalysis && structuredAnalysis.elements) {
-              // Usar el resumen si existe
-              if (structuredAnalysis.summary) {
-                analysisResponse = {
-                  analysis: cleaningStatusService.generateGeminiAnalysisText(structuredAnalysis.elements),
-                  formattedAnalysis: true,
-                  elements: structuredAnalysis.elements,
-                  summary: structuredAnalysis.summary,
-                  source: 'structured'
-                };
-              }
-              // Si no hay resumen pero hay elementos, generarlo
-              else if (structuredAnalysis.elements.length > 0) {
-                const summary = cleaningStatusService.generateCleaningSummary(structuredAnalysis.elements);
-                const formattedText = cleaningStatusService.generateGeminiAnalysisText(structuredAnalysis.elements);
-
-                // Actualizar documento con el resumen generado
-                await PDFDocument.findByIdAndUpdate(id, {
-                  g: formattedText,
-                  a: JSON.stringify({
-                    ...structuredAnalysis,
-                    summary: summary
-                  })
-                });
-
-                analysisResponse = {
-                  analysis: formattedText,
-                  formattedAnalysis: true,
-                  elements: structuredAnalysis.elements,
-                  summary: summary,
-                  source: 'generated'
-                };
-              }
-            }
-          } catch (parseError) {
-            console.error('Error al parsear análisis estructurado:', parseError);
-            // Continuar al siguiente paso si hay error
-          }
-        }
-
-        // Si no tenemos análisis aún, intentar generarlo con nuestro servicio
-        if (!analysisResponse && document.tx) {
-          console.log('Generando análisis rápido con servicio de estado de limpieza...');
-          try {
-            const cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx);
-
-            if (cleaningElements && cleaningElements.length > 0) {
-              console.log(`Se encontraron ${cleaningElements.length} elementos de limpieza`);
-              const formattedText = cleaningStatusService.generateGeminiAnalysisText(cleaningElements);
-              const summary = cleaningStatusService.generateCleaningSummary(cleaningElements);
-
-              // Guardar el análisis en el documento
-              await PDFDocument.findByIdAndUpdate(id, {
-                g: formattedText,
-                a: JSON.stringify({
-                  elements: cleaningElements,
-                  summary: summary
-                })
-              });
-
-              // Invalidar caché relacionada con este documento
-              cacheService.del(`document_${id}`);
-
-              analysisResponse = {
-                analysis: formattedText,
-                formattedAnalysis: true,
-                elements: cleaningElements,
-                summary: summary,
-                source: 'realtime'
-              };
-            } else {
-              console.log('No se encontraron elementos de limpieza, intentando con Gemini...');
-              // Si no encontramos elementos, intentar con Gemini
-              const geminiAnalysis = await analyzeWithGemini(document.tx);
-
-              if (geminiAnalysis) {
-                // Actualizar el documento con el análisis de Gemini
-                await PDFDocument.findByIdAndUpdate(id, {
-                  g: geminiAnalysis
-                });
-
-                // Invalidar caché relacionada con este documento
-                cacheService.del(`document_${id}`);
-
-                analysisResponse = {
-                  analysis: geminiAnalysis,
-                  formattedAnalysis: true,
-                  source: 'gemini'
-                };
-              }
-            }
-          } catch (analysisError) {
-            console.error('Error al generar análisis rápido:', analysisError);
-            // No lanzar error, continuar con el flujo
-          }
-        }
-
-        // Si aún no tenemos análisis, usar un análisis básico
-        if (!analysisResponse) {
-          const basicAnalysis = `Resultado análisis:\nNo se detectaron elementos de limpieza marcados en el documento.`;
-
-          analysisResponse = {
-            analysis: basicAnalysis,
-            formattedAnalysis: true,
-            source: 'fallback'
-          };
-        }
-
-        // Añadir timestamp para control de caché
-        analysisResponse._timestamp = Date.now();
-        analysisResponse._documentStatus = document.s;
-
-        return analysisResponse;
-      }
-
-      // Si el documento no está procesado, verificar si ha pasado mucho tiempo
-      if (document.s === 'p' && document.processingStarted) {
-        const processingTime = Date.now() - document.processingStarted;
-        // Si han pasado más de 2 minutos en procesamiento, intentar procesarlo rápidamente
-        if (processingTime > 120000) { // 2 minutos
-          console.log(`Documento ${id} en procesamiento por ${Math.round(processingTime/1000)}s, iniciando procesamiento rápido`);
-
-          // Iniciar procesamiento rápido en segundo plano
-          setImmediate(() => {
-            processDocumentFast(id);
-          });
-
-          return {
-            analysis: 'El documento está siendo procesado nuevamente. Intente en 10-15 segundos.',
-            status: 'reprocessing',
-            formattedAnalysis: true,
-            estimatedTime: '10-15 segundos',
-            _timestamp: Date.now(),
-            _documentStatus: 'p'
-          };
-        }
-      }
-
-      // Iniciar procesamiento rápido para documentos pendientes
-      console.log(`Iniciando procesamiento rápido para documento ${id}`);
+      // Marcar como en procesamiento
+      await PDFDocument.findByIdAndUpdate(id, {
+        s: 'p',
+        processingStarted: Date.now()
+      });
 
       // Iniciar procesamiento en segundo plano
       setImmediate(() => {
         processDocumentFast(id);
       });
 
-      return {
+      return res.status(202).json({
         analysis: 'El documento está siendo procesado. Intente nuevamente en 5-10 segundos.',
         status: 'processing',
         formattedAnalysis: true,
         estimatedTime: '5-10 segundos',
-        _timestamp: Date.now(),
-        _documentStatus: document.s || 'p'
-      };
-    }, 300, { // 5 minutos de caché por defecto
-      minInterval: 2000, // 2 segundos entre actualizaciones
-      backgroundRefresh: true, // Actualizar en segundo plano
-      maxAge: result => result && result._documentStatus === 'p' ? 5000 : 60000, // 5 segundos para pendientes, 1 minuto para completos
-      forceRefresh: forceRefresh // Respetar el parámetro de forzar actualización
-    });
-
-    // Si el documento no existe, manejar el error
-    if (!analysisResult) {
-      return res.status(404).json({ error: 'Documento o análisis no encontrado' });
+        _timestamp: Date.now()
+      });
     }
 
+    // Si el documento está completado pero necesita regenerar el análisis
+    if (document.s === 'c') {
+      console.log(`Documento ${id} está completado pero necesita regenerar análisis`);
+
+      // Intentar generar análisis con el servicio de estado de limpieza
+      try {
+        if (document.tx) {
+          console.log('Generando análisis con servicio de estado de limpieza...');
+          const cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx, true); // Forzar nuevo análisis
+
+          if (cleaningElements && cleaningElements.length > 0) {
+            console.log(`Se encontraron ${cleaningElements.length} elementos de limpieza`);
+            const formattedText = cleaningStatusService.generateGeminiAnalysisText(cleaningElements);
+            const summary = cleaningStatusService.generateCleaningSummary(cleaningElements);
+
+            // Guardar el análisis en MongoDB
+            await PDFDocument.findByIdAndUpdate(id, {
+              g: formattedText,
+              a: JSON.stringify({
+                elements: cleaningElements,
+                summary: summary
+              }),
+              analysisVersion: CURRENT_ANALYSIS_VERSION,
+              actualizado: new Date()
+            });
+
+            // Devolver el análisis generado
+            return res.status(200).json({
+              documentId: document._id,
+              title: document.t,
+              status: document.s,
+              analysis: formattedText,
+              elements: cleaningElements,
+              summary: summary,
+              source: 'regenerated',
+              _timestamp: Date.now()
+            });
+          } else {
+            // Si no se encontraron elementos, intentar con Gemini
+            console.log('No se encontraron elementos de limpieza, intentando con Gemini...');
+            const geminiAnalysis = await analyzeWithGemini(document.tx);
+
+            if (geminiAnalysis) {
+              // Guardar el análisis en MongoDB
+              await PDFDocument.findByIdAndUpdate(id, {
+                g: geminiAnalysis,
+                analysisVersion: CURRENT_ANALYSIS_VERSION,
+                actualizado: new Date()
+              });
+
+              // Devolver el análisis generado
+              return res.status(200).json({
+                documentId: document._id,
+                title: document.t,
+                status: document.s,
+                analysis: geminiAnalysis,
+                source: 'gemini',
+                _timestamp: Date.now()
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error al regenerar análisis:', error);
+        // Continuar con el flujo si hay error
+      }
+    }
+
+    // Si llegamos aquí, es un caso no manejado o un error
+    console.log(`Iniciando procesamiento para documento ${id} (caso no manejado)`);
+
+    // Marcar como en procesamiento
+    await PDFDocument.findByIdAndUpdate(id, {
+      s: 'p',
+      processingStarted: Date.now()
+    });
+
+    // Iniciar procesamiento en segundo plano
+    setImmediate(() => {
+      processDocumentFast(id);
+    });
+
     // Responder al cliente
-    return res.status(analysisResult.status === 'processing' || analysisResult.status === 'reprocessing' ? 202 : 200).json(analysisResult);
+    return res.status(202).json({
+      analysis: 'El documento está siendo procesado. Intente nuevamente en 5-10 segundos.',
+      status: 'processing',
+      formattedAnalysis: true,
+      estimatedTime: '5-10 segundos',
+      _timestamp: Date.now()
+    });
 
   } catch (error) {
     console.error('Error al analizar PDF:', error);
@@ -831,7 +823,9 @@ async function processDocumentFast(documentId) {
       g: formattedText,                     // Análisis formateado
       a: JSON.stringify(structuredData),    // Datos estructurados
       s: 'c',                               // Estado completado
-      processingCompleted: new Date()        // Marca de tiempo de finalización
+      processingCompleted: new Date(),       // Marca de tiempo de finalización
+      analysisVersion: CURRENT_ANALYSIS_VERSION, // Versión del algoritmo
+      actualizado: new Date()               // Fecha de actualización
     });
 
     console.log(`Procesamiento rápido completado para documento: ${documentId}`);
@@ -1250,7 +1244,7 @@ exports.getDocumentAnalysis = async (req, res) => {
 };
 
 /**
- * Corregir errores de análisis en documentos con manejo mejorado de errores
+ * Corregir errores de análisis en documentos usando solo MongoDB
  */
 exports.fixDocumentAnalysis = async (req, res) => {
   try {
@@ -1258,11 +1252,6 @@ exports.fixDocumentAnalysis = async (req, res) => {
 
     // Registrar la solicitud para depuración
     console.log(`Solicitud de corrección de análisis para documento ${id}`);
-
-    // Invalidar caché relacionada con este documento antes de empezar
-    // Esto asegura que no se use caché obsoleta durante el proceso
-    cacheService.del(`document_${id}`);
-    cacheService.del(`analysis_${id}`);
 
     // Obtener el modelo PDFDocument
     const PDFDocument = await getPDFDocumentModel();
@@ -1289,11 +1278,8 @@ exports.fixDocumentAnalysis = async (req, res) => {
     let cleaningElements = [];
 
     try {
-      // Forzar un nuevo análisis ignorando la caché
-      const cacheKey = `cleaning_status_${Buffer.from(document.tx.substring(0, 100)).toString('base64')}`;
-      cacheService.del(cacheKey); // Invalidar caché de análisis previo
-
-      cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx);
+      // Forzar un nuevo análisis
+      cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx, true);
     } catch (analysisError) {
       console.error('Error en el servicio de análisis de limpieza:', analysisError);
       // Intentar con Gemini como respaldo
@@ -1304,7 +1290,9 @@ exports.fixDocumentAnalysis = async (req, res) => {
         // Actualizar el documento con el análisis de Gemini
         await PDFDocument.findByIdAndUpdate(id, {
           g: geminiAnalysis,
-          s: 'c' // Marcar como completado
+          s: 'c', // Marcar como completado
+          analysisVersion: CURRENT_ANALYSIS_VERSION,
+          actualizado: new Date()
         });
 
         // Responder con el análisis de Gemini
@@ -1332,7 +1320,9 @@ exports.fixDocumentAnalysis = async (req, res) => {
         // Actualizar el documento con el análisis de Gemini
         await PDFDocument.findByIdAndUpdate(id, {
           g: geminiAnalysis,
-          s: 'c' // Marcar como completado
+          s: 'c', // Marcar como completado
+          analysisVersion: CURRENT_ANALYSIS_VERSION,
+          actualizado: new Date()
         });
 
         // Responder con el análisis de Gemini
@@ -1361,13 +1351,10 @@ exports.fixDocumentAnalysis = async (req, res) => {
         elements: cleaningElements,
         summary: summary
       }),
-      s: 'c' // Marcar como completado
+      s: 'c', // Marcar como completado
+      analysisVersion: CURRENT_ANALYSIS_VERSION,
+      actualizado: new Date()
     });
-
-    // Invalidar caché relacionada con este documento nuevamente
-    // para asegurar que los cambios sean visibles inmediatamente
-    cacheService.del(`document_${id}`);
-    cacheService.del(`analysis_${id}`);
 
     // Responder con el nuevo análisis
     return res.status(200).json({
@@ -1380,16 +1367,6 @@ exports.fixDocumentAnalysis = async (req, res) => {
 
   } catch (error) {
     console.error('Error al corregir análisis del documento:', error);
-    // Intentar invalidar caché incluso en caso de error
-    try {
-      if (req.params.id) {
-        cacheService.del(`document_${req.params.id}`);
-        cacheService.del(`analysis_${req.params.id}`);
-      }
-    } catch (cacheError) {
-      console.error('Error al invalidar caché:', cacheError);
-    }
-
     res.status(500).json({
       error: 'Error al corregir análisis del documento',
       message: error.message

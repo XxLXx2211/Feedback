@@ -215,26 +215,17 @@ function detectStateInLine(line, surroundingLines = []) {
 /**
  * Analiza un texto completo para detectar estados de limpieza de todos los elementos
  * @param {string} text - Texto completo del PDF
- * @param {boolean} forceRefresh - Si es true, ignora la caché y genera un nuevo análisis
+ * @param {boolean} forceRefresh - Si es true, ignora cualquier caché y genera un nuevo análisis
  * @returns {Array} - Array de objetos con información de elementos y estados
  */
 function analyzeCleaningStatus(text, forceRefresh = false) {
   if (!text) return [];
 
-  // Usar caché si está disponible y no se fuerza recarga
-  const cacheKey = `cleaning_status_${Buffer.from(text.substring(0, 100)).toString('base64')}`;
+  // Generar un identificador único para este texto
+  const textId = Buffer.from(text.substring(0, 100)).toString('base64');
 
-  if (!forceRefresh) {
-    const cachedResult = cacheService.get(cacheKey);
-
-    if (cachedResult) {
-      console.log('Usando resultado en caché para análisis de estado de limpieza');
-      return cachedResult;
-    }
-  } else {
-    console.log('Forzando nuevo análisis de estado de limpieza, ignorando caché');
-    // Invalidar caché existente
-    cacheService.del(cacheKey);
+  if (forceRefresh) {
+    console.log('Forzando nuevo análisis de estado de limpieza');
   }
 
   console.log('Analizando estado de limpieza en texto...');
