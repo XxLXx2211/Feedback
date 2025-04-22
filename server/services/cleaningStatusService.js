@@ -92,6 +92,19 @@ function detectStateInLine(line, surroundingLines = []) {
     detectionMethod: 'none'
   };
 
+  // Verificar si la línea contiene palabras clave que indican problemas
+  const lineContext = line.toLowerCase();
+  const problemKeywords = ['sucio', 'sucia', 'sucias', 'manchado', 'manchada', 'manchadas', 'polvo', 'roto', 'rota', 'rotas', 'dañado', 'dañada', 'dañadas'];
+
+  // Si la línea contiene palabras clave de problemas, probablemente no sea Excelente
+  const hasProblemKeyword = problemKeywords.some(keyword => lineContext.includes(keyword));
+  let problemDetected = false;
+
+  if (hasProblemKeyword) {
+    problemDetected = true;
+    // console.log(`  Detectada palabra clave de problema: ${problemKeywords.filter(k => lineContext.includes(k)).join(', ')}`);
+  }
+
   // Verificar patrones de casillas marcadas
   for (const pattern of STATE_PATTERNS.checkbox) {
     const match = line.match(pattern);
@@ -150,12 +163,22 @@ function detectStateInLine(line, surroundingLines = []) {
         } else {
           // Usar el método tradicional basado en posición
           const position = positions[0];
-          result.state = position === 0 ? 'Excelente' :
-                        position === 1 ? 'Bueno' :
-                        position === 2 ? 'Regular' :
-                        position === 3 ? 'Deficiente' : 'No determinado';
-          result.confidence = 0.7;
-          result.detectionMethod = 'checkbox-position';
+
+          // Si se detectó un problema en el texto, ajustar el estado
+          if (problemDetected && (position === 0 || position === 1)) {
+            // Si hay palabras clave de problemas, no puede ser Excelente o Bueno
+            result.state = 'Regular';
+            result.confidence = 0.75;
+            result.detectionMethod = 'checkbox-position-adjusted';
+            console.log(`Estado ajustado a Regular debido a palabras clave de problemas en: "${line}"`);
+          } else {
+            result.state = position === 0 ? 'Excelente' :
+                          position === 1 ? 'Bueno' :
+                          position === 2 ? 'Regular' :
+                          position === 3 ? 'Deficiente' : 'No determinado';
+            result.confidence = 0.7;
+            result.detectionMethod = 'checkbox-position';
+          }
         }
       }
       break;
@@ -431,6 +454,22 @@ function analyzeCleaningStatus(text, forceRefresh = false) {
   // Ya no guardamos en caché, siempre usamos resultados frescos
   console.log(`Se encontraron ${elements.length} elementos de limpieza`);
 
+  // Verificar si hay elementos con observaciones que indican problemas
+  const problemKeywords = ['sucio', 'sucia', 'sucias', 'manchado', 'manchada', 'manchadas', 'polvo', 'roto', 'rota', 'rotas', 'dañado', 'dañada', 'dañadas'];
+
+  // Revisar cada elemento para ajustar estados basados en observaciones
+  for (const element of elements) {
+    if (element.state === 'Excelente' || element.state === 'Bueno') {
+      // Si la observación contiene palabras clave de problemas, ajustar el estado
+      if (element.observation && problemKeywords.some(keyword => element.observation.toLowerCase().includes(keyword))) {
+        console.log(`Ajustando estado de "${element.element}" de ${element.state} a Regular debido a observación: "${element.observation}"`);
+        element.state = 'Regular';
+        element.confidence = Math.max(element.confidence * 0.9, 0.6); // Reducir confianza pero mantener un mínimo
+        element.detectionMethod += '-adjusted';
+      }
+    }
+  }
+
   return elements;
 }
 
@@ -516,27 +555,47 @@ function generateCleaningSummary(elements) {
     // 3. Más del 25% en Regular: 🟡Regular
     // 4. Más de 3 en Deficiente: 🔴Deficiente
 
+    // Imprimir información detallada para depuración
+    console.log(`Resumen de estado de limpieza: Excelente=${statusCounts['Excelente']}, Bueno=${statusCounts['Bueno']}, Regular=${statusCounts['Regular']}, Deficiente=${statusCounts['Deficiente']}, No determinado=${statusCounts['No determinado']}`);
+    console.log(`Porcentajes: Regular=${regularPercentage.toFixed(2)}%, ExcelenteGood=${excellentGoodCount}/${determinedCount}`);
+
+    // Aplicar reglas en orden de prioridad
     if (deficientCount > 3) {
       overallStatus = 'Deficiente';
       statusEmoji = '🔴';
       statusDescription = 'Deficiente';
+      console.log('Regla aplicada: Más de 3 elementos deficientes');
     } else if (regularPercentage > 25) {
       overallStatus = 'Regular';
       statusEmoji = '🟡';
       statusDescription = 'Regular';
-    } else if (regularCount >= 2) {
+      console.log('Regla aplicada: Más del 25% en Regular');
+    } else if (regularCount >= 2 && (excellentGoodCount + regularCount === determinedCount)) {
+      // Corregido: Asegurarse de que solo hay elementos Excelente/Bueno y Regular
       overallStatus = 'Bueno con Observaciones';
       statusEmoji = '🟢🔸';
       statusDescription = 'Bien con Observaciones';
+      console.log('Regla aplicada: Todo Excelente/Bueno con 2+ Regular');
     } else if (excellentGoodCount === determinedCount) {
       overallStatus = 'Excelente';
       statusEmoji = '🟢';
       statusDescription = 'Excelente';
+      console.log('Regla aplicada: Todo Excelente/Bueno');
     } else {
       // Caso por defecto si no cumple ninguna regla específica
       overallStatus = 'Bueno';
       statusEmoji = '🟢';
       statusDescription = 'Bueno';
+      console.log('Regla aplicada: Caso por defecto');
+    }
+
+    // Imprimir el resultado final
+    console.log(`Resultado final: ${statusEmoji} ${statusDescription}`);
+
+    // Verificar si hay muchos elementos 'No determinado' y ajustar el resultado
+    const undeterminedPercentage = (statusCounts['No determinado'] / elementsCount) * 100;
+    if (undeterminedPercentage > 30) {
+      console.log(`Advertencia: ${undeterminedPercentage.toFixed(2)}% de elementos sin estado determinado`);
     }
   }
 
