@@ -25,7 +25,9 @@ const STATE_PATTERNS = {
     // Casillas con texto como "marcada", "check", etc.
     /\[\s*(marcad[ao]|check|si|sí)\s*\]/i,
     // Casillas con números o letras dentro
-    /\[\s*([0-9EBRD])\s*\]/i
+    /\[\s*([0-9EBRD])\s*\]/i,
+    // Casillas con X en mayúscula o minúscula (prioridad alta)
+    /\[\s*[xX]\s*\]/i
   ],
 
   // Patrones para estados explícitos
@@ -164,14 +166,26 @@ function detectStateInLine(line, surroundingLines = []) {
           // Usar el método tradicional basado en posición
           const position = positions[0];
 
-          // Si se detectó un problema en el texto, ajustar el estado
-          if (problemDetected && (position === 0 || position === 1)) {
+          // Corregido: La posición 0 es Excelente, 1 es Bueno, 2 es Regular, 3 es Deficiente
+          // Buscar si hay una casilla marcada en la posición 3 (Deficiente)
+          const hasDeficientMark = line.toLowerCase().includes('[x]') && line.toLowerCase().split('[x]').length > 3;
+
+          // Si hay una marca en la cuarta posición, es Deficiente independientemente de otras condiciones
+          if (hasDeficientMark || position === 3) {
+            result.state = 'Deficiente';
+            result.confidence = 0.85;
+            result.detectionMethod = 'checkbox-position-deficient';
+            console.log(`Estado detectado como Deficiente en: "${line}"`);
+          }
+          // Si se detectó un problema en el texto y no es Deficiente, ajustar a Regular
+          else if (problemDetected && (position === 0 || position === 1)) {
             // Si hay palabras clave de problemas, no puede ser Excelente o Bueno
             result.state = 'Regular';
             result.confidence = 0.75;
             result.detectionMethod = 'checkbox-position-adjusted';
             console.log(`Estado ajustado a Regular debido a palabras clave de problemas en: "${line}"`);
           } else {
+            // Asignar estado según la posición de la marca
             result.state = position === 0 ? 'Excelente' :
                           position === 1 ? 'Bueno' :
                           position === 2 ? 'Regular' :
@@ -455,17 +469,56 @@ function analyzeCleaningStatus(text, forceRefresh = false) {
   console.log(`Se encontraron ${elements.length} elementos de limpieza`);
 
   // Verificar si hay elementos con observaciones que indican problemas
-  const problemKeywords = ['sucio', 'sucia', 'sucias', 'manchado', 'manchada', 'manchadas', 'polvo', 'roto', 'rota', 'rotas', 'dañado', 'dañada', 'dañadas'];
+  const problemKeywords = ['sucio', 'sucia', 'sucias', 'manchado', 'manchada', 'manchadas', 'polvo', 'roto', 'rota', 'rotas', 'dañado', 'dañada', 'dañadas', 'manchas', 'suciedad'];
+  const severeKeywords = ['muy sucio', 'muy sucia', 'muy manchado', 'muy manchada', 'demasiado', 'pésimo', 'pésima', 'terrible', 'inaceptable'];
 
   // Revisar cada elemento para ajustar estados basados en observaciones
   for (const element of elements) {
-    if (element.state === 'Excelente' || element.state === 'Bueno') {
-      // Si la observación contiene palabras clave de problemas, ajustar el estado
-      if (element.observation && problemKeywords.some(keyword => element.observation.toLowerCase().includes(keyword))) {
-        console.log(`Ajustando estado de "${element.element}" de ${element.state} a Regular debido a observación: "${element.observation}"`);
-        element.state = 'Regular';
-        element.confidence = Math.max(element.confidence * 0.9, 0.6); // Reducir confianza pero mantener un mínimo
-        element.detectionMethod += '-adjusted';
+    // Si la observación contiene palabras clave de problemas severos, ajustar a Deficiente
+    if (element.observation && severeKeywords.some(keyword => element.observation.toLowerCase().includes(keyword))) {
+      console.log(`Ajustando estado de "${element.element}" a Deficiente debido a problemas severos en observación: "${element.observation}"`);
+      element.state = 'Deficiente';
+      element.confidence = 0.8;
+      element.detectionMethod += '-severe-issue';
+    }
+    // Si es Excelente o Bueno pero tiene problemas, ajustar a Regular
+    else if ((element.state === 'Excelente' || element.state === 'Bueno') &&
+             element.observation &&
+             problemKeywords.some(keyword => element.observation.toLowerCase().includes(keyword))) {
+      console.log(`Ajustando estado de "${element.element}" de ${element.state} a Regular debido a observación: "${element.observation}"`);
+      element.state = 'Regular';
+      element.confidence = Math.max(element.confidence * 0.9, 0.6); // Reducir confianza pero mantener un mínimo
+      element.detectionMethod += '-adjusted';
+    }
+  }
+
+  // Buscar explícitamente casillas marcadas en la cuarta posición (Deficiente)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].toLowerCase();
+    // Buscar líneas con 4 casillas donde la cuarta está marcada
+    if (line.includes('[') && line.includes(']') &&
+        (line.match(/\[/g) || []).length >= 4 &&
+        (line.match(/\]/g) || []).length >= 4) {
+
+      // Verificar si la cuarta casilla está marcada con X
+      const casillas = line.split('[').map(part => part.split(']')[0]);
+      if (casillas.length >= 5 && (casillas[4].includes('x') || casillas[4].includes('*') || casillas[4].includes('✓'))) {
+        console.log(`Detectada casilla Deficiente marcada en: "${lines[i]}"`);
+
+        // Buscar a qué elemento corresponde esta línea
+        for (const element of elements) {
+          const elementLower = element.element.toLowerCase();
+          if (line.includes(elementLower) ||
+              (i > 0 && lines[i-1].toLowerCase().includes(elementLower)) ||
+              (i > 1 && lines[i-2].toLowerCase().includes(elementLower))) {
+
+            console.log(`Ajustando estado de "${element.element}" a Deficiente debido a casilla marcada`);
+            element.state = 'Deficiente';
+            element.confidence = 0.9;
+            element.detectionMethod = 'fourth-checkbox-marked';
+            break;
+          }
+        }
       }
     }
   }
@@ -549,38 +602,41 @@ function generateCleaningSummary(elements) {
     // Porcentaje de elementos en estado Regular
     const regularPercentage = (regularCount / determinedCount) * 100;
 
-    // Aplicar las reglas especificadas:
-    // 1. Todo en Excelente/Bien: 🟢Excelente
-    // 2. Todo en Excelente/Bien pero con dos o más en regular: 🟢🔸Bien con Observaciones
-    // 3. Más del 25% en Regular: 🟡Regular
-    // 4. Más de 3 en Deficiente: 🔴Deficiente
+    // Aplicar las reglas especificadas (corregidas):
+    // 1. Si hay elementos Deficientes: 🔴Deficiente (prioridad máxima)
+    // 2. Más del 25% en Regular: 🟡Regular
+    // 3. Todo en Excelente/Bien pero con dos o más en regular: 🟢🔸Bien con Observaciones
+    // 4. Todo en Excelente/Bien: 🟢Excelente
 
     // Imprimir información detallada para depuración
     console.log(`Resumen de estado de limpieza: Excelente=${statusCounts['Excelente']}, Bueno=${statusCounts['Bueno']}, Regular=${statusCounts['Regular']}, Deficiente=${statusCounts['Deficiente']}, No determinado=${statusCounts['No determinado']}`);
-    console.log(`Porcentajes: Regular=${regularPercentage.toFixed(2)}%, ExcelenteGood=${excellentGoodCount}/${determinedCount}`);
+    console.log(`Porcentajes: Regular=${regularPercentage.toFixed(2)}%, ExcelenteGood=${excellentGoodCount}/${determinedCount}, Deficiente=${deficientCount}`);
 
-    // Aplicar reglas en orden de prioridad
-    if (deficientCount > 3) {
+    // Aplicar reglas en orden de prioridad (corregido)
+    if (deficientCount > 0) {
+      // REGLA 1: Si hay CUALQUIER elemento Deficiente, el estado general es Deficiente
       overallStatus = 'Deficiente';
       statusEmoji = '🔴';
       statusDescription = 'Deficiente';
-      console.log('Regla aplicada: Más de 3 elementos deficientes');
+      console.log(`Regla aplicada: Hay ${deficientCount} elementos deficientes`);
     } else if (regularPercentage > 25) {
+      // REGLA 2: Si más del 25% está en Regular, el estado general es Regular
       overallStatus = 'Regular';
       statusEmoji = '🟡';
       statusDescription = 'Regular';
-      console.log('Regla aplicada: Más del 25% en Regular');
+      console.log(`Regla aplicada: ${regularPercentage.toFixed(2)}% en Regular (más del 25%)`);
     } else if (regularCount >= 2 && (excellentGoodCount + regularCount === determinedCount)) {
-      // Corregido: Asegurarse de que solo hay elementos Excelente/Bueno y Regular
+      // REGLA 3: Si todo está en Excelente/Bueno pero hay 2+ en Regular, es Bien con Observaciones
       overallStatus = 'Bueno con Observaciones';
       statusEmoji = '🟢🔸';
       statusDescription = 'Bien con Observaciones';
-      console.log('Regla aplicada: Todo Excelente/Bueno con 2+ Regular');
+      console.log(`Regla aplicada: ${regularCount} elementos en Regular (menos del 25% pero 2 o más)`);
     } else if (excellentGoodCount === determinedCount) {
+      // REGLA 4: Si todo está en Excelente/Bueno, el estado general es Excelente
       overallStatus = 'Excelente';
       statusEmoji = '🟢';
       statusDescription = 'Excelente';
-      console.log('Regla aplicada: Todo Excelente/Bueno');
+      console.log('Regla aplicada: Todo en Excelente/Bueno');
     } else {
       // Caso por defecto si no cumple ninguna regla específica
       overallStatus = 'Bueno';
