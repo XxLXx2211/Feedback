@@ -91,57 +91,15 @@ exports.uploadPDF = async (req, res) => {
 };
 
 /**
- * Obtener todos los documentos con paginación, caché agresiva y carga rápida
+ * Obtener todos los documentos con paginación usando solo MongoDB
  */
 exports.getDocuments = async (req, res) => {
   try {
     // Parámetros de paginación
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const forceRefresh = req.query.refresh === 'true';
 
-    // Generar clave de caché basada en los parámetros de paginación
-    const cacheKey = `documents_page_${page}_limit_${limit}`;
-
-    // Verificar si tenemos una versión en caché para responder inmediatamente
-    if (!forceRefresh) {
-      const cachedResult = cacheService.get(cacheKey);
-      if (cachedResult) {
-        // Responder inmediatamente con datos en caché
-        // Actualizar en segundo plano si es necesario
-        if (cachedResult._timestamp && (Date.now() - cachedResult._timestamp > 30000)) { // 30 segundos
-          // Actualizar en segundo plano sin bloquear la respuesta
-          setTimeout(async () => {
-            try {
-              // Verificar si hay documentos pendientes
-              const pendingDocs = cachedResult.documents?.filter(doc => doc.status === 'pending');
-              if (pendingDocs && pendingDocs.length > 0) {
-                console.log(`Actualizando estado de ${pendingDocs.length} documentos pendientes en segundo plano`);
-                // Obtener el modelo PDFDocument
-                const PDFDocument = await getPDFDocumentModel();
-                // Verificar estado actual de documentos pendientes
-                const pendingIds = pendingDocs.map(doc => doc._id);
-                const updatedDocs = await PDFDocument.find(
-                  { _id: { $in: pendingIds } },
-                  { _id: 1, s: 1 }
-                ).lean();
-
-                // Si alguno cambió de estado, invalidar caché
-                const statusChanged = updatedDocs.some(doc => doc.s !== 'p');
-                if (statusChanged) {
-                  console.log('Estado de documentos actualizado, invalidando caché');
-                  cacheService.del(cacheKey);
-                }
-              }
-            } catch (bgError) {
-              console.error('Error en actualización de caché en segundo plano:', bgError);
-            }
-          }, 100);
-        }
-
-        return res.status(200).json(cachedResult);
-      }
-    }
+    console.log(`Obteniendo documentos - página ${page}, límite ${limit}`);
 
     // Obtener el modelo PDFDocument
     const PDFDocument = await getPDFDocumentModel();
@@ -149,91 +107,76 @@ exports.getDocuments = async (req, res) => {
     // Buscar documentos con paginación y proyección optimizada
     const skip = (page - 1) * limit;
 
-    // Usar getOrSet con actualización en segundo plano
-    const result = await cacheService.getOrSet(cacheKey, async () => {
-      // Consulta principal para obtener documentos
-      const documentsPromise = PDFDocument.find({}, {
-        t: 1,           // título
-        d: 1,           // descripción
-        f: 1,           // nombre de archivo
-        s: 1,           // estado
-        g: 1,           // análisis de Gemini (para verificar si está disponible)
-        creado: 1,      // fecha de creación
-        actualizado: 1, // fecha de actualización
-        conv: 1,        // conversaciones
-        processingStarted: 1,    // para calcular tiempo de procesamiento
-        processingCompleted: 1   // para calcular tiempo de procesamiento
-      })
-      .sort({ creado: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean()
-      .exec();
+    // Consulta principal para obtener documentos
+    const documentsPromise = PDFDocument.find({}, {
+      t: 1,           // título
+      d: 1,           // descripción
+      f: 1,           // nombre de archivo
+      s: 1,           // estado
+      g: 1,           // análisis de Gemini (para verificar si está disponible)
+      creado: 1,      // fecha de creación
+      actualizado: 1, // fecha de actualización
+      conv: 1,        // conversaciones
+      processingStarted: 1,    // para calcular tiempo de procesamiento
+      processingCompleted: 1   // para calcular tiempo de procesamiento
+    })
+    .sort({ creado: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean()
+    .exec();
 
-      // Consulta para contar documentos (en paralelo)
-      const countPromise = cacheService.getOrSet('documents_total_count', async () => {
-        return await PDFDocument.estimatedDocumentCount();
-      }, 300); // 5 minutos de caché
+    // Consulta para contar documentos (en paralelo)
+    const countPromise = PDFDocument.estimatedDocumentCount();
 
-      // Ejecutar ambas consultas en paralelo
-      const [documents, totalDocuments] = await Promise.all([documentsPromise, countPromise]);
+    // Ejecutar ambas consultas en paralelo
+    const [documents, totalDocuments] = await Promise.all([documentsPromise, countPromise]);
 
-      // Calcular metadatos de paginación
-      const totalPages = Math.ceil(totalDocuments / limit);
+    // Calcular metadatos de paginación
+    const totalPages = Math.ceil(totalDocuments / limit);
 
-      // Transformar documentos con información adicional
-      const transformedDocuments = documents.map(doc => {
-        // Calcular tiempo de procesamiento si está disponible
-        let processingTime = null;
-        if (doc.processingStarted && doc.processingCompleted) {
-          processingTime = Math.round((doc.processingCompleted - doc.processingStarted) / 1000);
-        }
-
-        return {
-          _id: doc._id,
-          title: doc.t || 'Sin título',
-          description: doc.d || '',
-          filename: doc.f || 'documento.pdf',
-          status: doc.s === 'p' ? 'pending' : doc.s === 'c' ? 'completed' : 'error',
-          createdAt: doc.creado || new Date(),
-          updatedAt: doc.actualizado || new Date(),
-          hasConversation: Array.isArray(doc.conv) && doc.conv.length > 0,
-          hasAnalysis: !!doc.g, // Indicador de si tiene análisis disponible
-          processingTime: processingTime // Tiempo de procesamiento en segundos (si está disponible)
-        };
-      });
-
-      // Construir resultado
-      const result = {
-        documents: transformedDocuments,
-        pagination: {
-          totalDocuments,
-          totalPages,
-          currentPage: page,
-          pageSize: limit,
-          hasNextPage: page < totalPages,
-          hasPrevPage: page > 1
-        },
-        _timestamp: Date.now(),
-        _pendingCount: transformedDocuments.filter(doc => doc.status === 'pending').length,
-        _errorCount: transformedDocuments.filter(doc => doc.status === 'error').length
-      };
-
-      // Si es la primera página, guardar como fallback
-      if (page === 1) {
-        cacheService.set('last_valid_documents_page_1_limit_20', result, 3600); // 1 hora
+    // Transformar documentos con información adicional
+    const transformedDocuments = documents.map(doc => {
+      // Calcular tiempo de procesamiento si está disponible
+      let processingTime = null;
+      if (doc.processingStarted && doc.processingCompleted) {
+        processingTime = Math.round((doc.processingCompleted - doc.processingStarted) / 1000);
       }
 
-      return result;
-    }, 60, { // 1 minuto de caché
-      minInterval: 2000, // 2 segundos entre actualizaciones
-      backgroundRefresh: true, // Actualizar en segundo plano
-      maxAge: 30000, // Considerar obsoleto después de 30 segundos
-      forceRefresh: forceRefresh // Respetar el parámetro de forzar actualización
+      return {
+        _id: doc._id,
+        title: doc.t || 'Sin título',
+        description: doc.d || '',
+        filename: doc.f || 'documento.pdf',
+        status: doc.s === 'p' ? 'pending' : doc.s === 'c' ? 'completed' : 'error',
+        createdAt: doc.creado || new Date(),
+        updatedAt: doc.actualizado || new Date(),
+        hasConversation: Array.isArray(doc.conv) && doc.conv.length > 0,
+        hasAnalysis: !!doc.g, // Indicador de si tiene análisis disponible
+        processingTime: processingTime // Tiempo de procesamiento en segundos (si está disponible)
+      };
     });
+
+    // Construir resultado
+    const result = {
+      documents: transformedDocuments,
+      pagination: {
+        totalDocuments,
+        totalPages,
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      },
+      _timestamp: Date.now(),
+      _pendingCount: transformedDocuments.filter(doc => doc.status === 'pending').length,
+      _errorCount: transformedDocuments.filter(doc => doc.status === 'error').length
+    };
 
     // Responder al cliente
     res.status(200).json(result);
+    console.log(`Enviados ${transformedDocuments.length} documentos al cliente`);
+
   } catch (error) {
     console.error('Error al obtener documentos:', error);
 
@@ -258,17 +201,6 @@ exports.getDocuments = async (req, res) => {
           _error: 'Error de conexión a la base de datos'
         });
       }
-
-      // Intentar obtener documentos desde la caché
-      const cachedDocuments = cacheService.get('last_valid_documents_page_1_limit_20');
-      if (cachedDocuments) {
-        console.log('Usando documentos en caché como fallback');
-        return res.status(200).json({
-          ...cachedDocuments,
-          _cached: true,
-          _fallback: true
-        });
-      }
     } catch (fallbackError) {
       console.error('Error al intentar proporcionar fallback:', fallbackError);
     }
@@ -283,83 +215,69 @@ exports.getDocuments = async (req, res) => {
 };
 
 /**
- * Obtener un documento por ID con carga rápida y caché
+ * Obtener un documento por ID usando solo MongoDB
  */
 exports.getDocument = async (req, res) => {
   try {
     const { id } = req.params;
-    const forceRefresh = req.query.refresh === 'true';
 
-    // Usar caché para respuesta inmediata
-    const cacheKey = `document_${id}`;
+    console.log(`Obteniendo documento con ID: ${id}`);
 
-    // Usar getOrSet con actualización en segundo plano
-    const transformedDocument = await cacheService.getOrSet(cacheKey, async () => {
-      // Obtener el modelo PDFDocument
-      const PDFDocument = await getPDFDocumentModel();
+    // Obtener el modelo PDFDocument
+    const PDFDocument = await getPDFDocumentModel();
 
-      // Buscar documento con proyección optimizada
-      const document = await PDFDocument.findById(id, {
-        pdf: 0 // Excluir el PDF completo para mejorar rendimiento
-      });
-
-      if (!document) {
-        throw new Error('Documento no encontrado');
-      }
-
-      // Si el documento está en procesamiento, verificar si ha pasado mucho tiempo
-      if (document.s === 'p' && document.processingStarted) {
-        const processingTime = Date.now() - document.processingStarted;
-        // Si han pasado más de 2 minutos en procesamiento, intentar procesarlo nuevamente
-        if (processingTime > 120000) { // 2 minutos
-          console.log(`Documento ${id} en procesamiento por ${Math.round(processingTime/1000)}s, reiniciando procesamiento`);
-          // Iniciar procesamiento en segundo plano
-          setImmediate(() => {
-            processDocumentFast(id);
-          });
-        }
-      }
-
-      // Transformar para mantener compatibilidad con el frontend
-      return {
-        _id: document._id,
-        title: document.t,
-        description: document.d,
-        filename: document.f,
-        status: document.s === 'p' ? 'Pendiente' :
-                document.s === 'c' ? 'Procesado' : 'Error',
-        text: document.tx,
-        analysis: document.a,
-        geminiAnalysis: document.g, // Análisis de Gemini
-        conversations: document.conv ? document.conv.map(c => ({
-          message: c.m,
-          isUser: c.u,
-          timestamp: c.t
-        })) : [],
-        createdAt: document.creado,
-        updatedAt: document.actualizado,
-        processingStarted: document.processingStarted,
-        processingCompleted: document.processingCompleted,
-        // Calcular tiempo de procesamiento si está disponible
-        processingTime: document.processingStarted && document.processingCompleted ?
-          Math.round((document.processingCompleted - document.processingStarted) / 1000) : null,
-        _timestamp: Date.now(),
-        _documentStatus: document.s
-      };
-    }, document => document.status !== 'Pendiente' ? 300 : 30, { // 5 minutos para documentos completos, 30 segundos para pendientes
-      minInterval: 2000, // 2 segundos entre actualizaciones
-      backgroundRefresh: true, // Actualizar en segundo plano
-      maxAge: document => document._documentStatus === 'p' ? 5000 : 60000, // 5 segundos para pendientes, 1 minuto para completos
-      forceRefresh: forceRefresh // Respetar el parámetro de forzar actualización
+    // Buscar documento con proyección optimizada
+    const document = await PDFDocument.findById(id, {
+      pdf: 0 // Excluir el PDF completo para mejorar rendimiento
     });
 
-    // Si el documento no existe, manejar el error
-    if (!transformedDocument) {
+    if (!document) {
       return res.status(404).json({ error: 'Documento no encontrado' });
     }
 
+    // Si el documento está en procesamiento, verificar si ha pasado mucho tiempo
+    if (document.s === 'p' && document.processingStarted) {
+      const processingTime = Date.now() - document.processingStarted;
+      // Si han pasado más de 2 minutos en procesamiento, intentar procesarlo nuevamente
+      if (processingTime > 120000) { // 2 minutos
+        console.log(`Documento ${id} en procesamiento por ${Math.round(processingTime/1000)}s, reiniciando procesamiento`);
+        // Iniciar procesamiento en segundo plano
+        setImmediate(() => {
+          processDocumentFast(id);
+        });
+      }
+    }
+
+    // Transformar para mantener compatibilidad con el frontend
+    const transformedDocument = {
+      _id: document._id,
+      title: document.t,
+      description: document.d,
+      filename: document.f,
+      status: document.s === 'p' ? 'Pendiente' :
+              document.s === 'c' ? 'Procesado' : 'Error',
+      text: document.tx,
+      analysis: document.a,
+      geminiAnalysis: document.g, // Análisis de Gemini
+      conversations: document.conv ? document.conv.map(c => ({
+        message: c.m,
+        isUser: c.u,
+        timestamp: c.t
+      })) : [],
+      createdAt: document.creado,
+      updatedAt: document.actualizado,
+      processingStarted: document.processingStarted,
+      processingCompleted: document.processingCompleted,
+      // Calcular tiempo de procesamiento si está disponible
+      processingTime: document.processingStarted && document.processingCompleted ?
+        Math.round((document.processingCompleted - document.processingStarted) / 1000) : null,
+      _timestamp: Date.now()
+    };
+
     // Responder al cliente
     res.status(200).json(transformedDocument);
+    console.log(`Documento ${id} enviado al cliente`);
+
   } catch (error) {
     console.error('Error al obtener documento:', error);
     res.status(500).json({ error: 'Error al obtener documento' });
