@@ -111,11 +111,11 @@ function detectStateInLine(line, surroundingLines = []) {
         // Analizar el contexto para determinar qué representa cada posición
         const lineContext = line.toLowerCase();
 
-        // Detectar si hay indicadores de orden de las casillas
-        const hasExcelente = lineContext.includes('excelente') || lineContext.includes('e)');
-        const hasBueno = lineContext.includes('bueno') || lineContext.includes('b)');
-        const hasRegular = lineContext.includes('regular') || lineContext.includes('r)');
-        const hasDeficiente = lineContext.includes('deficiente') || lineContext.includes('d)');
+        // Detectar si hay indicadores de orden de las casillas (mejorado)
+        const hasExcelente = lineContext.includes('excelente') || lineContext.includes('e)') || lineContext.includes('e ') || lineContext.includes('excel');
+        const hasBueno = lineContext.includes('bueno') || lineContext.includes('b)') || lineContext.includes('b ') || lineContext.includes('bien');
+        const hasRegular = lineContext.includes('regular') || lineContext.includes('r)') || lineContext.includes('r ') || lineContext.includes('reg');
+        const hasDeficiente = lineContext.includes('deficiente') || lineContext.includes('d)') || lineContext.includes('d ') || lineContext.includes('def');
 
         // Si tenemos al menos 3 indicadores, podemos determinar el orden
         if ([hasExcelente, hasBueno, hasRegular, hasDeficiente].filter(Boolean).length >= 3) {
@@ -172,6 +172,35 @@ function detectStateInLine(line, surroundingLines = []) {
         result.confidence = 0.8;
         result.detectionMethod = 'explicit';
         break;
+      }
+    }
+  }
+
+  // Buscar patrones adicionales de casillas en formato alternativo
+  if (result.state === 'No determinado') {
+    // Buscar patrones como "E B R D" con alguna marca
+    const ebrdPattern = /\b([EBRD])\s+([EBRD])\s+([EBRD])\s+([EBRD])\b/i;
+    const ebrdMatch = line.match(ebrdPattern);
+
+    if (ebrdMatch) {
+      // Verificar si hay alguna marca cerca (X, *, etc.)
+      const lineContext = line.toLowerCase();
+      if (lineContext.includes('x') || lineContext.includes('*') || lineContext.includes('✓')) {
+        // Determinar qué letra está marcada
+        if (lineContext.includes('e') || lineContext.includes('excel')) {
+          result.state = 'Excelente';
+          result.confidence = 0.8;
+        } else if (lineContext.includes('b') || lineContext.includes('buen')) {
+          result.state = 'Bueno';
+          result.confidence = 0.8;
+        } else if (lineContext.includes('r') || lineContext.includes('reg')) {
+          result.state = 'Regular';
+          result.confidence = 0.8;
+        } else if (lineContext.includes('d') || lineContext.includes('def')) {
+          result.state = 'Deficiente';
+          result.confidence = 0.8;
+        }
+        result.detectionMethod = 'ebrd-pattern';
       }
     }
   }
@@ -240,19 +269,25 @@ function analyzeCleaningStatus(text, forceRefresh = false) {
 
     // Verificar si la línea contiene alguno de los elementos de limpieza
     for (const element of CLEANING_ELEMENTS) {
-      if (line.includes(element)) {
-        // Obtener líneas cercanas para contexto (hasta 3 líneas antes y después)
+      // Usar una búsqueda más flexible para detectar elementos
+      // Permitir variaciones en mayúsculas/minúsculas y espacios
+      const elementLower = element.toLowerCase();
+      const lineLower = line.toLowerCase();
+
+      // Verificar si el elemento está en la línea
+      if (lineLower.includes(elementLower)) {
+        // Obtener líneas cercanas para contexto (hasta 5 líneas antes y después para mayor contexto)
         const surroundingLines = [];
 
         // Líneas anteriores
-        for (let j = 1; j <= 3; j++) {
+        for (let j = 1; j <= 5; j++) {
           if (i - j >= 0) {
             surroundingLines.push(lines[i - j]);
           }
         }
 
         // Líneas posteriores
-        for (let j = 1; j <= 3; j++) {
+        for (let j = 1; j <= 5; j++) {
           if (i + j < lines.length) {
             surroundingLines.push(lines[i + j]);
           }
@@ -275,9 +310,9 @@ function analyzeCleaningStatus(text, forceRefresh = false) {
     }
   }
 
-  // Si no se encontraron elementos, intentar un enfoque más agresivo
-  if (elements.length === 0) {
-    console.log('No se encontraron elementos con el enfoque estándar, intentando enfoque alternativo...');
+  // Si se encontraron pocos elementos, intentar un enfoque más agresivo
+  if (elements.length < 10) {
+    console.log('Se encontraron pocos elementos, intentando enfoque alternativo para encontrar más...');
 
     // Buscar cualquier línea que pueda contener un estado
     for (let i = 0; i < lines.length; i++) {
@@ -285,37 +320,109 @@ function analyzeCleaningStatus(text, forceRefresh = false) {
 
       // Verificar si la línea contiene algún patrón de estado
       const hasStatePattern = STATE_PATTERNS.explicit.some(pattern => pattern.test(line)) ||
-                             STATE_PATTERNS.checkbox.some(pattern => pattern.test(line));
+                             STATE_PATTERNS.checkbox.some(pattern => pattern.test(line)) ||
+                             /\[[xX\*\/\\\+\-\|✓✔]\]/i.test(line) || // Casillas marcadas
+                             /\b[EBRD]\b/i.test(line); // Letras sueltas
 
       if (hasStatePattern) {
-        // Buscar el elemento más cercano en las líneas anteriores
+        // Buscar el elemento más cercano en las líneas cercanas
         let elementFound = false;
 
-        for (let j = 0; j <= 3; j++) {
-          if (i - j >= 0) {
-            const prevLine = lines[i - j];
+        // Buscar en líneas anteriores y posteriores (mayor rango)
+        for (let j = -5; j <= 5; j++) {
+          if (i + j >= 0 && i + j < lines.length && j !== 0) {
+            const nearLine = lines[i + j];
+            const nearLineLower = nearLine.toLowerCase();
 
             for (const element of CLEANING_ELEMENTS) {
-              if (prevLine.includes(element) && !elements.some(e => e.element === element)) {
-                // Detectar estado en la línea actual
-                const stateInfo = detectStateInLine(line, [prevLine]);
+              const elementLower = element.toLowerCase();
+              // Verificar si el elemento está en la línea y no ha sido detectado aún
+              if (nearLineLower.includes(elementLower) && !elements.some(e => e.element === element)) {
+                // Detectar estado en la línea actual con más contexto
+                const surroundingLines = [];
 
-                // Agregar el elemento a la lista
-                elements.push({
-                  element,
-                  state: stateInfo.state,
-                  observation: stateInfo.observation,
-                  confidence: stateInfo.confidence * 0.8, // Reducir confianza por ser enfoque alternativo
-                  detectionMethod: `alternative-${stateInfo.detectionMethod}`
-                });
+                // Añadir más líneas de contexto
+                for (let k = -3; k <= 3; k++) {
+                  if (i + k >= 0 && i + k < lines.length) {
+                    surroundingLines.push(lines[i + k]);
+                  }
+                }
 
-                elementFound = true;
-                break;
+                const stateInfo = detectStateInLine(line, surroundingLines);
+
+                // Solo agregar si se detectó un estado válido
+                if (stateInfo.state !== 'No determinado') {
+                  // Agregar el elemento a la lista
+                  elements.push({
+                    element,
+                    state: stateInfo.state,
+                    observation: stateInfo.observation || nearLine, // Usar la línea cercana como observación si no hay otra
+                    confidence: stateInfo.confidence * 0.8, // Reducir confianza por ser enfoque alternativo
+                    detectionMethod: `alternative-${stateInfo.detectionMethod}`
+                  });
+
+                  elementFound = true;
+                  break;
+                }
               }
             }
 
             if (elementFound) break;
           }
+        }
+      }
+    }
+  }
+
+  // Buscar elementos adicionales que puedan estar en el documento pero no se detectaron
+  // Esto es útil para formularios con formato no estándar
+  for (const element of CLEANING_ELEMENTS) {
+    // Verificar si el elemento ya fue detectado
+    if (!elements.some(e => e.element === element)) {
+      // Buscar el elemento en el texto completo
+      const elementLower = element.toLowerCase();
+      let elementFound = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].toLowerCase();
+
+        if (line.includes(elementLower)) {
+          // Buscar estados en líneas cercanas
+          const surroundingLines = [];
+
+          // Añadir líneas de contexto
+          for (let j = -5; j <= 5; j++) {
+            if (i + j >= 0 && i + j < lines.length) {
+              surroundingLines.push(lines[i + j]);
+            }
+          }
+
+          // Buscar estados en las líneas cercanas
+          let stateFound = false;
+
+          for (const nearLine of surroundingLines) {
+            // Buscar patrones de estado
+            if (/\[[xX\*\/\\\+\-\|✓✔]\]/i.test(nearLine) || /\b[EBRD]\b/i.test(nearLine)) {
+              const stateInfo = detectStateInLine(nearLine, surroundingLines);
+
+              if (stateInfo.state !== 'No determinado') {
+                // Agregar el elemento a la lista
+                elements.push({
+                  element,
+                  state: stateInfo.state,
+                  observation: stateInfo.observation || '',
+                  confidence: stateInfo.confidence * 0.7, // Reducir confianza aún más
+                  detectionMethod: `deep-search-${stateInfo.detectionMethod}`
+                });
+
+                stateFound = true;
+                elementFound = true;
+                break;
+              }
+            }
+          }
+
+          if (stateFound) break;
         }
       }
     }
@@ -430,15 +537,38 @@ function generateGeminiAnalysisText(elements) {
     return 'No se detectaron elementos de limpieza en el documento.';
   }
 
+  // Agrupar elementos por nombre para evitar duplicados
+  const elementMap = new Map();
+
+  // Procesar cada elemento y mantener solo la mejor detección para cada nombre de elemento
+  elements.forEach(element => {
+    const key = element.element;
+
+    // Si el elemento ya existe, verificar cuál tiene mayor confianza
+    if (elementMap.has(key)) {
+      const existing = elementMap.get(key);
+      if (element.confidence > existing.confidence) {
+        elementMap.set(key, element);
+      }
+    } else {
+      elementMap.set(key, element);
+    }
+  });
+
+  // Convertir el mapa a un array ordenado alfabéticamente
+  const uniqueElements = Array.from(elementMap.values())
+    .sort((a, b) => a.element.localeCompare(b.element));
+
+  // Generar el texto de análisis
   let analysisText = 'Resultado análisis:\n';
 
   // Agregar cada elemento con su estado
-  elements.forEach(element => {
+  uniqueElements.forEach(element => {
     analysisText += `El estado del "${element.element}" es ${element.state}\n`;
   });
 
   // Agregar observaciones
-  const observations = elements
+  const observations = uniqueElements
     .filter(element => element.observation)
     .map(element => `• ${element.element}: ${element.observation}`);
 
@@ -446,6 +576,16 @@ function generateGeminiAnalysisText(elements) {
     analysisText += '\nObservaciones:\n';
     analysisText += observations.join('\n');
   }
+
+  // Agregar resumen
+  const summary = generateCleaningSummary(uniqueElements);
+  analysisText += `\n\nResumen:\n`;
+  analysisText += `• Estado general: ${summary.overallStatus}\n`;
+  analysisText += `• Elementos analizados: ${summary.elementsCount}\n`;
+  analysisText += `• Excelente: ${summary.statusCounts.Excelente} (${summary.statusPercentages.Excelente}%)\n`;
+  analysisText += `• Bueno: ${summary.statusCounts.Bueno} (${summary.statusPercentages.Bueno}%)\n`;
+  analysisText += `• Regular: ${summary.statusCounts.Regular} (${summary.statusPercentages.Regular}%)\n`;
+  analysisText += `• Deficiente: ${summary.statusCounts.Deficiente} (${summary.statusPercentages.Deficiente}%)\n`;
 
   return analysisText;
 }
