@@ -369,56 +369,58 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
   // Si llegamos aquí, todos los intentos fallaron
   console.error(`Todos los intentos fallaron para ${key} (${retryCount + 1} intentos)`);
 
+  // Estrategia de fallback en cascada:
+  // 1. Intentar usar el valor en caché actual si existe
+  if (cachedValue !== null) {
+    console.log(`Usando caché existente después de error para ${key}`);
+    const result = { ...cachedValue };
+    result._fromCache = true;
+    result._cachedAt = now;
+    result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
+    result._error = true;
+    return result;
+  }
 
-    // Estrategia de fallback en cascada:
-    // 1. Intentar usar el valor en caché actual si existe
-    if (cachedValue !== null) {
-      console.log(`Usando caché existente después de error para ${key}`);
-      const result = { ...cachedValue };
-      result._fromCache = true;
-      result._cachedAt = now;
-      result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
-      result._error = true;
-      return result;
+  // 2. Intentar usar el último valor válido conocido
+  const lastValidValue = get(`last_valid_${key}`, true, true);
+  if (lastValidValue !== null) {
+    console.log(`Usando último valor válido conocido para ${key}`);
+    const result = { ...lastValidValue };
+    result._fromCache = true;
+    result._cachedAt = now;
+    result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
+    result._fallback = true;
+    return result;
+  }
+
+  // 3. Si es un error de MongoDB relacionado con operadores $, intentar con una consulta más simple
+  if (lastError && lastError.name === 'MongoServerError' &&
+      (lastError.message.includes('field names may not start with') ||
+       lastError.message.includes('$'))) {
+    console.log(`Error de sintaxis MongoDB detectado para ${key}, intentando consulta simplificada`);
+
+    // Registrar este error para evitar reintentos frecuentes
+    set(`error_${key}`, { timestamp: Date.now(), message: lastError.message }, 300); // 5 minutos
+
+    // Devolver un objeto vacío o array vacío dependiendo del contexto
+    if (key.includes('document') || key.includes('pdf')) {
+      return {
+        documents: [],
+        pagination: { totalDocuments: 0, totalPages: 1, currentPage: 1, pageSize: 20 },
+        _error: true,
+        _errorType: 'mongodb',
+        _timestamp: now
+      };
     }
 
-    // 2. Intentar usar el último valor válido conocido
-    const lastValidValue = get(`last_valid_${key}`, true, true);
-    if (lastValidValue !== null) {
-      console.log(`Usando último valor válido conocido para ${key}`);
-      const result = { ...lastValidValue };
-      result._fromCache = true;
-      result._cachedAt = now;
-      result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
-      result._fallback = true;
-      return result;
-    }
+    return Array.isArray(cachedValue) ? [] : { _error: true, _timestamp: now };
+  }
 
-    // 3. Si es un error de MongoDB relacionado con operadores $, intentar con una consulta más simple
-    if (error.name === 'MongoServerError' &&
-        (error.message.includes('field names may not start with') ||
-         error.message.includes('$'))) {
-      console.log(`Error de sintaxis MongoDB detectado para ${key}, intentando consulta simplificada`);
-
-      // Registrar este error para evitar reintentos frecuentes
-      set(`error_${key}`, { timestamp: Date.now(), message: error.message }, 300); // 5 minutos
-
-      // Devolver un objeto vacío o array vacío dependiendo del contexto
-      if (key.includes('document') || key.includes('pdf')) {
-        return {
-          documents: [],
-          pagination: { totalDocuments: 0, totalPages: 1, currentPage: 1, pageSize: 20 },
-          _error: true,
-          _errorType: 'mongodb',
-          _timestamp: now
-        };
-      }
-
-      return Array.isArray(cachedValue) ? [] : { _error: true, _timestamp: now };
-    }
-
-    // 4. Si todo lo demás falla, lanzar el error
-    throw error;
+  // 4. Si todo lo demás falla, lanzar el error
+  if (lastError) {
+    throw lastError;
+  } else {
+    throw new Error(`Error desconocido al obtener datos para ${key}`);
   }
 };
 
