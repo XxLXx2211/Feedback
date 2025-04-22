@@ -398,15 +398,24 @@ exports.deleteDocument = async (req, res) => {
 };
 
 /**
- * Analizar un PDF con carga rápida y caché
+ * Analizar un PDF con carga rápida y caché mejorada
  */
 exports.analyzePDF = async (req, res) => {
   try {
     const { id } = req.params;
     const forceRefresh = req.query.refresh === 'true';
 
+    // Registrar la solicitud para depuración
+    console.log(`Solicitud de análisis para documento ${id}${forceRefresh ? ' (forzando recarga)' : ''}`);
+
     // Usar caché para respuesta inmediata
     const cacheKey = `analysis_${id}`;
+
+    // Si se fuerza la recarga, invalidar la caché primero
+    if (forceRefresh) {
+      console.log(`Invalidando caché para ${cacheKey} debido a forzar recarga`);
+      cacheService.del(cacheKey);
+    }
 
     // Usar getOrSet con actualización en segundo plano para el análisis
     const analysisResult = await cacheService.getOrSet(cacheKey, async () => {
@@ -419,7 +428,8 @@ exports.analyzePDF = async (req, res) => {
         g: 1,  // análisis de Gemini
         a: 1,  // análisis estructurado
         tx: 1, // texto extraído
-        processingStarted: 1 // para verificar tiempo de procesamiento
+        processingStarted: 1, // para verificar tiempo de procesamiento
+        processingCompleted: 1 // para verificar si el procesamiento está completo
       });
 
       if (!document) {
@@ -488,29 +498,57 @@ exports.analyzePDF = async (req, res) => {
         // Si no tenemos análisis aún, intentar generarlo con nuestro servicio
         if (!analysisResponse && document.tx) {
           console.log('Generando análisis rápido con servicio de estado de limpieza...');
-          const cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx);
+          try {
+            const cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx);
 
-          if (cleaningElements && cleaningElements.length > 0) {
-            console.log(`Se encontraron ${cleaningElements.length} elementos de limpieza`);
-            const formattedText = cleaningStatusService.generateGeminiAnalysisText(cleaningElements);
-            const summary = cleaningStatusService.generateCleaningSummary(cleaningElements);
+            if (cleaningElements && cleaningElements.length > 0) {
+              console.log(`Se encontraron ${cleaningElements.length} elementos de limpieza`);
+              const formattedText = cleaningStatusService.generateGeminiAnalysisText(cleaningElements);
+              const summary = cleaningStatusService.generateCleaningSummary(cleaningElements);
 
-            // Guardar el análisis en el documento
-            await PDFDocument.findByIdAndUpdate(id, {
-              g: formattedText,
-              a: JSON.stringify({
+              // Guardar el análisis en el documento
+              await PDFDocument.findByIdAndUpdate(id, {
+                g: formattedText,
+                a: JSON.stringify({
+                  elements: cleaningElements,
+                  summary: summary
+                })
+              });
+
+              // Invalidar caché relacionada con este documento
+              cacheService.del(`document_${id}`);
+
+              analysisResponse = {
+                analysis: formattedText,
+                formattedAnalysis: true,
                 elements: cleaningElements,
-                summary: summary
-              })
-            });
+                summary: summary,
+                source: 'realtime'
+              };
+            } else {
+              console.log('No se encontraron elementos de limpieza, intentando con Gemini...');
+              // Si no encontramos elementos, intentar con Gemini
+              const geminiAnalysis = await analyzeWithGemini(document.tx);
 
-            analysisResponse = {
-              analysis: formattedText,
-              formattedAnalysis: true,
-              elements: cleaningElements,
-              summary: summary,
-              source: 'realtime'
-            };
+              if (geminiAnalysis) {
+                // Actualizar el documento con el análisis de Gemini
+                await PDFDocument.findByIdAndUpdate(id, {
+                  g: geminiAnalysis
+                });
+
+                // Invalidar caché relacionada con este documento
+                cacheService.del(`document_${id}`);
+
+                analysisResponse = {
+                  analysis: geminiAnalysis,
+                  formattedAnalysis: true,
+                  source: 'gemini'
+                };
+              }
+            }
+          } catch (analysisError) {
+            console.error('Error al generar análisis rápido:', analysisError);
+            // No lanzar error, continuar con el flujo
           }
         }
 
@@ -1212,11 +1250,19 @@ exports.getDocumentAnalysis = async (req, res) => {
 };
 
 /**
- * Corregir errores de análisis en documentos
+ * Corregir errores de análisis en documentos con manejo mejorado de errores
  */
 exports.fixDocumentAnalysis = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Registrar la solicitud para depuración
+    console.log(`Solicitud de corrección de análisis para documento ${id}`);
+
+    // Invalidar caché relacionada con este documento antes de empezar
+    // Esto asegura que no se use caché obsoleta durante el proceso
+    cacheService.del(`document_${id}`);
+    cacheService.del(`analysis_${id}`);
 
     // Obtener el modelo PDFDocument
     const PDFDocument = await getPDFDocumentModel();
@@ -1240,9 +1286,64 @@ exports.fixDocumentAnalysis = async (req, res) => {
 
     // Intentar generar un nuevo análisis con el servicio de estado de limpieza
     console.log('Generando nuevo análisis con servicio de estado de limpieza...');
-    const cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx);
+    let cleaningElements = [];
+
+    try {
+      // Forzar un nuevo análisis ignorando la caché
+      const cacheKey = `cleaning_status_${Buffer.from(document.tx.substring(0, 100)).toString('base64')}`;
+      cacheService.del(cacheKey); // Invalidar caché de análisis previo
+
+      cleaningElements = cleaningStatusService.analyzeCleaningStatus(document.tx);
+    } catch (analysisError) {
+      console.error('Error en el servicio de análisis de limpieza:', analysisError);
+      // Intentar con Gemini como respaldo
+      console.log('Intentando con Gemini como respaldo...');
+      const geminiAnalysis = await analyzeWithGemini(document.tx);
+
+      if (geminiAnalysis) {
+        // Actualizar el documento con el análisis de Gemini
+        await PDFDocument.findByIdAndUpdate(id, {
+          g: geminiAnalysis,
+          s: 'c' // Marcar como completado
+        });
+
+        // Responder con el análisis de Gemini
+        return res.status(200).json({
+          success: true,
+          message: 'Análisis corregido exitosamente con Gemini',
+          analysis: geminiAnalysis,
+          source: 'gemini'
+        });
+      }
+
+      // Si Gemini también falla, devolver error
+      return res.status(500).json({
+        error: 'Error al analizar el documento',
+        message: analysisError.message
+      });
+    }
 
     if (!cleaningElements || cleaningElements.length === 0) {
+      // Si no se encontraron elementos, intentar con Gemini
+      console.log('No se encontraron elementos de limpieza, intentando con Gemini...');
+      const geminiAnalysis = await analyzeWithGemini(document.tx);
+
+      if (geminiAnalysis) {
+        // Actualizar el documento con el análisis de Gemini
+        await PDFDocument.findByIdAndUpdate(id, {
+          g: geminiAnalysis,
+          s: 'c' // Marcar como completado
+        });
+
+        // Responder con el análisis de Gemini
+        return res.status(200).json({
+          success: true,
+          message: 'Análisis corregido exitosamente con Gemini',
+          analysis: geminiAnalysis,
+          source: 'gemini'
+        });
+      }
+
       return res.status(400).json({
         error: 'No se pudieron detectar elementos de limpieza',
         elementsFound: 0
@@ -1263,7 +1364,8 @@ exports.fixDocumentAnalysis = async (req, res) => {
       s: 'c' // Marcar como completado
     });
 
-    // Invalidar caché relacionada con este documento
+    // Invalidar caché relacionada con este documento nuevamente
+    // para asegurar que los cambios sean visibles inmediatamente
     cacheService.del(`document_${id}`);
     cacheService.del(`analysis_${id}`);
 
@@ -1278,6 +1380,16 @@ exports.fixDocumentAnalysis = async (req, res) => {
 
   } catch (error) {
     console.error('Error al corregir análisis del documento:', error);
+    // Intentar invalidar caché incluso en caso de error
+    try {
+      if (req.params.id) {
+        cacheService.del(`document_${req.params.id}`);
+        cacheService.del(`analysis_${req.params.id}`);
+      }
+    } catch (cacheError) {
+      console.error('Error al invalidar caché:', cacheError);
+    }
+
     res.status(500).json({
       error: 'Error al corregir análisis del documento',
       message: error.message

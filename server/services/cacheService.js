@@ -201,7 +201,7 @@ const shouldThrottle = (key, minInterval = 1000, countSaved = true) => {
 };
 
 /**
- * Función de ayuda para obtener datos con caché y throttling
+ * Función de ayuda para obtener datos con caché y throttling mejorado
  * @param {string} key - Clave de caché
  * @param {Function} fetchFunction - Función para obtener datos si no están en caché
  * @param {number} ttl - Tiempo de vida en segundos
@@ -209,6 +209,7 @@ const shouldThrottle = (key, minInterval = 1000, countSaved = true) => {
  * @param {number} options.minInterval - Intervalo mínimo entre solicitudes en ms
  * @param {boolean} options.forceRefresh - Forzar actualización ignorando throttling
  * @param {boolean} options.backgroundRefresh - Actualizar en segundo plano sin bloquear respuesta
+ * @param {number|Function} options.maxAge - Tiempo máximo de vida en ms o función que lo calcula
  * @returns {Promise<any>} - Datos obtenidos
  */
 const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
@@ -216,16 +217,28 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
     minInterval = 5000,
     forceRefresh = false,
     backgroundRefresh = false,
-    maxAge = 60000 // 1 minuto por defecto
+    maxAge = 60000, // 1 minuto por defecto
+    retryOnError = true,
+    maxRetries = 2
   } = options;
+
+  // Registrar operación para depuración
+  console.log(`Cache operation: ${key}${forceRefresh ? ' (force refresh)' : ''}`);
+
+  // Si se fuerza la actualización, eliminar la caché existente
+  if (forceRefresh) {
+    console.log(`Invalidando caché para ${key} debido a forzar recarga`);
+    del(key);
+  }
 
   // Intentar obtener de caché primero
   const cachedValue = get(key, false, true); // No añadir flag _fromCache aún
   const now = Date.now();
 
   // Verificar si el valor en caché es demasiado viejo
+  const calculatedMaxAge = typeof maxAge === 'function' ? maxAge(cachedValue) : maxAge;
   const isCacheStale = cachedValue && cachedValue._timestamp &&
-                      (now - cachedValue._timestamp > maxAge);
+                      (now - cachedValue._timestamp > calculatedMaxAge);
 
   // Si hay valor en caché y no está obsoleto y no se fuerza actualización
   if (cachedValue !== null && !forceRefresh && !isCacheStale) {
@@ -246,6 +259,7 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
     result._cachedAt = now;
     result._cacheAge = Math.round((now - (result._timestamp || now)) / 1000);
     result._refreshing = true;
+    result._stale = true; // Indicar que está obsoleto
 
     // Actualizar en segundo plano
     setTimeout(async () => {
@@ -253,12 +267,26 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
         console.log(`Actualizando datos en segundo plano para ${key}`);
         const freshData = await fetchFunction();
         if (freshData) {
-          freshData._timestamp = Date.now();
+          // Añadir metadatos
+          if (typeof freshData === 'object' && freshData !== null) {
+            freshData._timestamp = Date.now();
+            freshData._refreshed = true;
+            freshData._refreshedAt = new Date().toISOString();
+          }
+
+          // Guardar en caché
           set(key, freshData, ttl);
           set(`last_valid_${key}`, freshData, 86400); // 24 horas
+          console.log(`Actualización en segundo plano completada para ${key}`);
         }
       } catch (bgError) {
         console.error(`Error en actualización en segundo plano para ${key}:`, bgError);
+        // Registrar el error pero no invalidar la caché
+        set(`error_${key}`, {
+          timestamp: Date.now(),
+          message: bgError.message,
+          stack: bgError.stack
+        }, 300); // 5 minutos
       }
     }, 100);
 
@@ -284,23 +312,63 @@ const getOrSet = async (key, fetchFunction, ttl = 600, options = {}) => {
   }
 
   // Si no está en caché o se fuerza actualización, obtener datos frescos
-  try {
-    console.log(`Obteniendo datos frescos para ${key}`);
-    const freshData = await fetchFunction();
+  let retryCount = 0;
+  let lastError = null;
 
-    // Almacenar en caché solo si hay datos válidos
-    if (freshData) {
-      // Añadir timestamp para saber cuándo se obtuvo
-      if (typeof freshData === 'object' && freshData !== null) {
-        freshData._timestamp = Date.now();
+  while (retryCount <= maxRetries) {
+    try {
+      if (retryCount > 0) {
+        console.log(`Reintento ${retryCount}/${maxRetries} para ${key}`);
+        // Esperar un poco antes de reintentar (tiempo exponencial)
+        await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, retryCount)));
+      } else {
+        console.log(`Obteniendo datos frescos para ${key}`);
       }
-      set(key, freshData, ttl);
-      // Guardar una copia como último valor conocido válido
-      set(`last_valid_${key}`, freshData, 86400); // 24 horas
+
+      const freshData = await fetchFunction();
+
+      // Almacenar en caché solo si hay datos válidos
+      if (freshData) {
+        // Añadir timestamp y metadatos para saber cuándo se obtuvo
+        if (typeof freshData === 'object' && freshData !== null) {
+          freshData._timestamp = Date.now();
+          freshData._fresh = true;
+          if (retryCount > 0) {
+            freshData._retryCount = retryCount;
+          }
+        }
+        set(key, freshData, ttl);
+        // Guardar una copia como último valor conocido válido
+        set(`last_valid_${key}`, freshData, 86400); // 24 horas
+
+        // Limpiar cualquier error registrado previamente
+        del(`error_${key}`);
+      }
+      return freshData;
+    } catch (error) {
+      console.error(`Error al obtener datos para caché (${key}) - Intento ${retryCount + 1}/${maxRetries + 1}:`, error);
+      lastError = error;
+
+      // Registrar el error
+      set(`error_${key}`, {
+        timestamp: Date.now(),
+        message: error.message,
+        attempt: retryCount + 1,
+        maxRetries: maxRetries + 1
+      }, 300); // 5 minutos
+
+      // Si no queremos reintentar o ya alcanzamos el máximo, salir del bucle
+      if (!retryOnError || retryCount >= maxRetries) {
+        break;
+      }
+
+      retryCount++;
     }
-    return freshData;
-  } catch (error) {
-    console.error(`Error al obtener datos para caché (${key}):`, error);
+  }
+
+  // Si llegamos aquí, todos los intentos fallaron
+  console.error(`Todos los intentos fallaron para ${key} (${retryCount + 1} intentos)`);
+
 
     // Estrategia de fallback en cascada:
     // 1. Intentar usar el valor en caché actual si existe
