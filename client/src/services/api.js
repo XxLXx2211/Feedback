@@ -13,7 +13,7 @@ if (process.env.REACT_APP_API_URL) {
   console.log('Usando URL de API desde variable de entorno:', API_URL);
 } else if (process.env.NODE_ENV === 'production') {
   // URL del backend en Railway para producción
-  API_URL = 'https://sermalite-feedback-production.up.railway.app/api';
+  API_URL = 'https://web-production-d1ba.up.railway.app/api';
   console.log('Usando URL de API de producción hardcodeada:', API_URL);
 } else {
   // URL local para desarrollo
