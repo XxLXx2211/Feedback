@@ -24,7 +24,6 @@ const pdfRoutes = require('./routes/pdfRoutes');
 const monitorRoutes = require('./routes/monitorRoutes');
 
 // Importar servicios optimizados
-const cacheService = require('./services/cacheService');
 const monitorService = require('./services/monitorService');
 
 // Inicializar servicios de optimización
@@ -234,7 +233,7 @@ app.get('/api/status', async (req, res) => {
       },
       system: {
         overloaded: overloadStatus.isOverloaded,
-        cacheEnabled: true,
+        mongodbStorage: true,
         queueEnabled: true,
         optimizationsEnabled: true
       }
@@ -278,7 +277,7 @@ app.get('/api', (req, res) => {
       '/api/monitor' // Nuevo endpoint de monitoreo
     ],
     optimizations: [
-      'Caché de consultas frecuentes',
+      'Almacenamiento permanente en MongoDB',
       'Procesamiento asíncrono de PDFs',
       'Monitoreo de recursos del sistema',
       'Índices optimizados en MongoDB',

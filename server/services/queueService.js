@@ -9,7 +9,7 @@ const path = require('path');
 const os = require('os');
 const { getPDFDocumentModel } = require('../models/PDFDocument');
 const { processPDF } = require('./pdfService');
-const cacheService = require('./cacheService');
+// Ya no usamos caché
 
 // Determinar si estamos en entorno de producción sin Redis
 const isProduction = process.env.NODE_ENV === 'production';
@@ -241,8 +241,8 @@ pdfProcessingQueue.process(NUM_WORKERS, async (job) => {
     await document.save();
     job.progress(100);
 
-    // Invalidar caché relacionada
-    cacheService.invalidatePattern(`pdf_${pdfId}_*`);
+    // Ya no usamos caché
+    console.log(`PDF ${pdfId} procesado correctamente`);
 
     return { success: true, pdfId, textLength: result.text.length };
   } catch (error) {
@@ -299,8 +299,8 @@ pdfAnalysisQueue.process(1, async (job) => {
 
     job.progress(100);
 
-    // Invalidar caché relacionada
-    cacheService.invalidatePattern(`pdf_analysis_${pdfId}`);
+    // Ya no usamos caché
+    console.log(`Análisis de PDF ${pdfId} completado correctamente`);
 
     return { success: true, pdfId };
   } catch (error) {

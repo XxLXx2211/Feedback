@@ -1,6 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cleaningStatusService = require('./cleaningStatusService');
-const cacheService = require('./cacheService');
 
 // Configurar cliente de Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -16,14 +15,8 @@ async function analyzeWithGemini(text) {
   try {
     console.log('Iniciando análisis mejorado de estado de limpieza...');
 
-    // Usar caché si está disponible
-    const cacheKey = `gemini_analysis_${Buffer.from(text.substring(0, 100)).toString('base64')}`;
-    const cachedResult = cacheService.get(cacheKey);
-
-    if (cachedResult) {
-      console.log('Usando resultado en caché para análisis de Gemini');
-      return cachedResult;
-    }
+    // Ya no usamos caché, siempre generamos resultados frescos
+    console.log('Generando análisis fresco sin caché');
 
     // Paso 1: Analizar el texto con nuestro servicio especializado
     console.log('Analizando texto con servicio de detección de estado de limpieza...');
@@ -40,8 +33,8 @@ async function analyzeWithGemini(text) {
       const summary = cleaningStatusService.generateCleaningSummary(cleaningElements);
       console.log('Resumen de estado de limpieza:', JSON.stringify(summary));
 
-      // Guardar en caché
-      cacheService.set(cacheKey, formattedText, 3600); // 1 hora
+      // Ya no guardamos en caché
+      console.log('Resultado generado sin usar caché');
 
       return formattedText;
     }
@@ -131,8 +124,8 @@ async function analyzeWithGemini(text) {
 
     console.log(`Análisis con Gemini completado: ${responseText.length} caracteres`);
 
-    // Guardar en caché
-    cacheService.set(cacheKey, responseText, 3600); // 1 hora
+    // Ya no guardamos en caché
+    console.log('Respuesta de Gemini generada sin usar caché');
 
     return responseText;
   } catch (error) {
@@ -166,14 +159,8 @@ async function generateChatResponse(userMessage, documentText, analysisResult) {
   try {
     console.log('Generando respuesta de chat mejorada...');
 
-    // Usar caché si está disponible
-    const cacheKey = `chat_response_${Buffer.from(userMessage).toString('base64')}_${Buffer.from(documentText.substring(0, 50)).toString('base64')}`;
-    const cachedResult = cacheService.get(cacheKey);
-
-    if (cachedResult) {
-      console.log('Usando respuesta en caché para chat');
-      return cachedResult;
-    }
+    // Ya no usamos caché, siempre generamos respuestas frescas
+    console.log('Generando respuesta de chat fresca sin caché');
 
     // Paso 1: Analizar el texto con nuestro servicio especializado para tener más contexto
     const cleaningElements = cleaningStatusService.analyzeCleaningStatus(documentText);
@@ -255,8 +242,8 @@ async function generateChatResponse(userMessage, documentText, analysisResult) {
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
-    // Guardar en caché
-    cacheService.set(cacheKey, responseText, 1800); // 30 minutos
+    // Ya no guardamos en caché
+    console.log('Respuesta de chat generada sin usar caché');
 
     return responseText;
   } catch (error) {
