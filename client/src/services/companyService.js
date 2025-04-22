@@ -63,3 +63,18 @@ export const deleteCompany = async (id) => {
     throw error;
   }
 };
+
+// Obtener historial de feedback de una empresa
+export const getCompanyFeedback = async (id) => {
+  try {
+    console.log(`Solicitando historial de feedback para la empresa con ID: ${id}`);
+    const response = await API.get(`/companies/${id}/feedback`);
+    console.log('Respuesta del servidor:', response.status, response.statusText);
+    console.log('Datos recibidos:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error al obtener historial de feedback de la empresa ${id}:`, error);
+    console.error('Detalles del error:', error.response?.data || error.message);
+    throw error;
+  }
+};

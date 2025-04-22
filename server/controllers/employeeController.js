@@ -265,11 +265,72 @@ exports.deleteEmployee = async (req, res) => {
 // Obtener historial de feedback de un empleado
 exports.getEmployeeFeedback = async (req, res) => {
   try {
-    const feedbacks = await Feedback.find({ empleado: req.params.id })
-      .populate('empresa', 'nombre')
-      .sort({ fecha_creacion: -1 });
+    console.log('Buscando feedbacks para el empleado ID:', req.params.id);
 
-    res.status(200).json(feedbacks);
+    // Verificar si el empleado existe
+    const employee = await Employee.findById(req.params.id);
+    console.log('Empleado encontrado:', employee ? 'Sí' : 'No');
+
+    // Buscar todos los feedbacks para depuración
+    const allFeedbacks = await Feedback.find().limit(10);
+    console.log('Total de feedbacks en la base de datos:', allFeedbacks.length);
+    if (allFeedbacks.length > 0) {
+      console.log('Ejemplo de un feedback:', {
+        _id: allFeedbacks[0]._id,
+        titulo: allFeedbacks[0].t,
+        empleado_id: allFeedbacks[0].e,
+        empresa_id: allFeedbacks[0].c,
+        fecha: allFeedbacks[0].f
+      });
+    }
+
+    // Buscar feedbacks usando el campo abreviado 'e' para empleado
+    // También buscar por el campo 'empleado' para compatibilidad con datos antiguos
+    const feedbacks = await Feedback.find({ $or: [{ e: req.params.id }, { empleado: req.params.id }] })
+      .populate('c', 'n') // c = empresa, n = nombre
+      .populate('e', 'n p') // e = empleado, n = nombre, p = puesto
+      .sort({ f: -1 }); // f = fecha_creacion
+
+    console.log('Feedbacks encontrados para este empleado:', feedbacks.length);
+    if (feedbacks.length > 0) {
+      console.log('IDs de los feedbacks encontrados:', feedbacks.map(f => f._id));
+    }
+
+    // Transformar los datos para mantener compatibilidad con el frontend
+    const transformedFeedbacks = feedbacks.map(f => {
+      // Crear un objeto con los campos transformados
+      const transformedFeedback = {
+        _id: f._id,
+        titulo: f.t,
+        empleado: f.e ? {
+          _id: f.e._id,
+          nombre_completo: f.e.n,
+          puesto: f.e.p
+        } : null,
+        empresa: f.c ? {
+          _id: f.c._id,
+          nombre: f.c.n
+        } : null,
+        respuestas: f.r ? f.r.map(r => ({
+          pregunta: r.q,
+          subpregunta: r.sq,
+          valor_escala: r.e,
+          valor_si_no: r.b,
+          valor_texto: r.tx
+        })) : [],
+        puntuacion_total: f.p,
+        anonimo: f.a,
+        completado: f.co,
+        fecha_creacion: f.f,
+        createdAt: f.creado,
+        updatedAt: f.actualizado
+      };
+
+      console.log('Feedback transformado:', transformedFeedback._id, transformedFeedback.titulo);
+      return transformedFeedback;
+    });
+
+    res.status(200).json(transformedFeedbacks);
   } catch (error) {
     console.error('Error al obtener historial de feedback:', error);
     res.status(500).json({ error: 'Error al obtener historial de feedback' });

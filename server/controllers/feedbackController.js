@@ -101,6 +101,14 @@ exports.createFeedback = async (req, res) => {
     // Transformar los datos al formato abreviado que espera el modelo
     const { titulo, empleado, empresa, anonimo, preguntas } = req.body;
 
+    console.log('Creando nuevo feedback con datos:', {
+      titulo,
+      empleado_id: empleado,
+      empresa_id: empresa,
+      anonimo,
+      num_preguntas: preguntas ? preguntas.length : 0
+    });
+
     // Crear objeto con campos abreviados
     const feedbackData = {
       t: titulo,                // t = titulo
@@ -111,9 +119,13 @@ exports.createFeedback = async (req, res) => {
       q: preguntas ? preguntas.map(p => p.pregunta) : []  // q = preguntas_seleccionadas
     };
 
+    console.log('Objeto feedbackData creado:', feedbackData);
+
     // Crear y guardar el feedback
     const feedback = new Feedback(feedbackData);
     await feedback.save();
+
+    console.log('Feedback guardado con ID:', feedback._id);
 
     // Transformar la respuesta para mantener compatibilidad con el frontend
     const transformedFeedback = {

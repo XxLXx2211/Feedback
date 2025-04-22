@@ -5,8 +5,8 @@ import axios from 'axios';
 const hostname = window.location.hostname;
 
 // Definir la URL de la API directamente para evitar problemas
-// Usar la URL correcta de Render
-const API_URL = 'https://sermalite-feedback-api.onrender.com/api';
+// Usar la URL local para desarrollo
+const API_URL = 'http://localhost:5000/api';
 
 // Imprimir la URL para depuración
 console.log('Usando URL de API hardcodeada:', API_URL);

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Table, Badge, Spinner, Alert, Modal, Form } from 'react-bootstrap';
-import { FaPlus, FaEdit, FaTrash, FaUserTie } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaTrash, FaUserTie, FaHistory, FaEye } from 'react-icons/fa';
 // Importamos los servicios para conectar con la API
-import { getEmployees, createEmployee, deleteEmployee, getEmployee, updateEmployee } from '../services/employeeService';
+import { getEmployees, createEmployee, deleteEmployee, getEmployee, updateEmployee, getEmployeeFeedback } from '../services/employeeService';
 import { getCompanies } from '../services/companyService';
 import './Employees.css';
 
@@ -12,6 +12,12 @@ const Employees = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Estados para el historial de feedbacks
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [employeeHistory, setEmployeeHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [currentEmployeeForHistory, setCurrentEmployeeForHistory] = useState(null);
 
   // Estados para el formulario de nuevo empleado
   const [showModal, setShowModal] = useState(false);
@@ -192,6 +198,26 @@ const Employees = () => {
     setFormError('');
   };
 
+  // Función para mostrar el historial de feedbacks de un empleado
+  const handleShowHistory = async (employeeId, employeeName) => {
+    try {
+      setLoadingHistory(true);
+      setCurrentEmployeeForHistory({ id: employeeId, name: employeeName });
+
+      console.log('Solicitando historial para el empleado:', employeeId);
+      const history = await getEmployeeFeedback(employeeId);
+      console.log('Historial recibido:', history);
+
+      setEmployeeHistory(history);
+      setShowHistoryModal(true);
+    } catch (err) {
+      setError('Error al cargar el historial de feedbacks. Por favor, intenta de nuevo.');
+      console.error('Error al cargar historial de feedbacks:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   // Función para manejar la actualización de un empleado
   const handleUpdateSubmit = async (e) => {
     e.preventDefault();
@@ -333,6 +359,14 @@ const Employees = () => {
                               onClick={() => handleOpenEditModal(employee._id)}
                             >
                               <FaEdit />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              title="Ver historial de feedbacks"
+                              onClick={() => handleShowHistory(employee._id, employee.nombre_completo)}
+                            >
+                              <FaHistory />
                             </Button>
                             <Button
                               variant="danger"
@@ -524,6 +558,87 @@ const Employees = () => {
             </div>
           </Form>
         </Modal.Body>
+      </Modal>
+
+      {/* Modal para mostrar el historial de feedbacks */}
+      <Modal
+        show={showHistoryModal}
+        onHide={() => setShowHistoryModal(false)}
+        size="lg"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            Historial de Feedbacks - {currentEmployeeForHistory?.name || 'Empleado'}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {loadingHistory ? (
+            <div className="text-center py-4">
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-3">Cargando historial...</p>
+            </div>
+          ) : employeeHistory.length === 0 ? (
+            <div className="text-center py-4">
+              <FaUserTie className="no-data-icon" style={{ fontSize: '3rem', opacity: 0.5 }} />
+              <p className="mt-3 text-muted">No hay feedbacks para este empleado</p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <Table hover>
+                <thead>
+                  <tr>
+                    <th>Título</th>
+                    <th>Empresa</th>
+                    <th>Estado</th>
+                    <th>Puntuación</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employeeHistory.map(feedback => (
+                    <tr key={feedback._id}>
+                      <td>{feedback.titulo || feedback.t}</td>
+                      <td>{feedback.empresa?.nombre || feedback.c?.n || 'N/A'}</td>
+                      <td>
+                        <Badge bg={feedback.completado || feedback.co ? 'success' : 'warning'}>
+                          {feedback.completado || feedback.co ? 'Completado' : 'Pendiente'}
+                        </Badge>
+                      </td>
+                      <td>
+                        {(feedback.completado || feedback.co) ? (
+                          <span className="fw-bold">{(feedback.puntuacion_total || feedback.p || 0).toFixed(1)}</span>
+                        ) : (
+                          <span className="text-muted" style={{ opacity: 0.7 }}>-</span>
+                        )}
+                      </td>
+                      <td>{new Date(feedback.fecha_creacion || feedback.f).toLocaleDateString()}</td>
+                      <td>
+                        <Button
+                          variant="info"
+                          size="sm"
+                          title="Ver detalles"
+                          onClick={() => {
+                            setShowHistoryModal(false);
+                            window.location.href = `/feedback/${feedback._id}`;
+                          }}
+                        >
+                          <FaEye />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowHistoryModal(false)}>
+            Cerrar
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );

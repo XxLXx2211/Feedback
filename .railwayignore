@@ -1,0 +1,44 @@
+# Archivos de desarrollo
+.git
+.github
+.vscode
+.idea
+*.log
+*.md
+!README.md
+
+# Archivos de prueba
+test
+tests
+__tests__
+*.test.js
+*.spec.js
+
+# Archivos temporales
+.tmp
+tmp
+temp
+*.tmp
+
+# Archivos de entorno local
+.env.local
+.env.development
+.env.test
+
+# Archivos de configuración específicos de otras plataformas
+fly.toml
+netlify.toml
+render.yaml
+.dockerignore
+
+# Archivos de documentación
+docs
+documentation
+
+# Archivos de dependencias
+node_modules
+*/node_modules
+
+# Archivos de construcción
+client/build
+dist

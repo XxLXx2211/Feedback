@@ -1,0 +1,87 @@
+/**
+ * Rutas para monitoreo del sistema
+ */
+const express = require('express');
+const router = express.Router();
+const monitorService = require('../services/monitorService');
+// Ya no usamos caché
+const { getQueuesStatus } = require('../services/queueService');
+const { authMiddleware, adminMiddleware } = require('../middleware/authMiddleware');
+
+// Ruta pública para verificar estado básico del sistema
+router.get('/status', async (req, res) => {
+  try {
+    // Incrementar contador de solicitudes
+    monitorService.incrementRequests(true);
+
+    // Verificar si el sistema está sobrecargado
+    const overloadStatus = await monitorService.isSystemOverloaded();
+
+    res.json({
+      status: 'online',
+      message: 'API del Sistema de Feedback funcionando correctamente',
+      timestamp: new Date().toISOString(),
+      overloaded: overloadStatus.isOverloaded
+    });
+  } catch (error) {
+    console.error('Error al verificar estado:', error);
+    monitorService.incrementRequests(false);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error al verificar estado del sistema',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Ruta protegida para información detallada del sistema (solo admin)
+router.get('/system-info', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    monitorService.incrementRequests(true);
+    const systemInfo = await monitorService.getSystemInfo();
+    res.json(systemInfo);
+  } catch (error) {
+    console.error('Error al obtener información del sistema:', error);
+    monitorService.incrementRequests(false);
+    res.status(500).json({
+      error: 'Error al obtener información del sistema',
+      message: error.message
+    });
+  }
+});
+
+// Ruta para verificar estado de las colas (solo admin)
+router.get('/queues', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    monitorService.incrementRequests(true);
+    const queuesStatus = await getQueuesStatus();
+    res.json(queuesStatus);
+  } catch (error) {
+    console.error('Error al obtener estado de las colas:', error);
+    monitorService.incrementRequests(false);
+    res.status(500).json({
+      error: 'Error al obtener estado de las colas',
+      message: error.message
+    });
+  }
+});
+
+// Ya no usamos caché, estas rutas han sido eliminadas
+
+// Ruta para resetear estadísticas (solo admin)
+router.post('/reset-stats', authMiddleware, adminMiddleware, (req, res) => {
+  try {
+    monitorService.incrementRequests(true);
+    const result = monitorService.resetStats();
+    res.json(result);
+  } catch (error) {
+    console.error('Error al resetear estadísticas:', error);
+    monitorService.incrementRequests(false);
+    res.status(500).json({
+      error: 'Error al resetear estadísticas',
+      message: error.message
+    });
+  }
+});
+
+module.exports = router;

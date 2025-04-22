@@ -58,10 +58,14 @@ export const deleteEmployee = async (id) => {
 // Obtener historial de feedback de un empleado
 export const getEmployeeFeedback = async (id) => {
   try {
+    console.log(`Solicitando historial de feedback para el empleado con ID: ${id}`);
     const response = await API.get(`/employees/${id}/feedback`);
+    console.log('Respuesta del servidor:', response.status, response.statusText);
+    console.log('Datos recibidos:', response.data);
     return response.data;
   } catch (error) {
     console.error(`Error al obtener historial de feedback del empleado ${id}:`, error);
+    console.error('Detalles del error:', error.response?.data || error.message);
     throw error;
   }
 };

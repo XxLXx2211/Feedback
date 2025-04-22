@@ -1,0 +1,31 @@
+# Dependencias
+node_modules
+*/node_modules
+
+# Archivos de construcción
+client/build
+
+# Archivos temporales
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Archivos de entorno
+.env
+.env.*
+server/.env
+client/.env
+
+# Archivos de logs
+*.log
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de Git
+.git
+.gitignore
+
+# Archivos de desarrollo
+.vscode
+.idea
