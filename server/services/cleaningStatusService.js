@@ -443,6 +443,8 @@ function generateCleaningSummary(elements) {
   if (!elements || elements.length === 0) {
     return {
       overallStatus: 'No determinado',
+      statusEmoji: '❓',
+      statusDescription: 'No determinado',
       statusCounts: {
         Excelente: 0,
         Bueno: 0,
@@ -491,35 +493,57 @@ function generateCleaningSummary(elements) {
     statusPercentages[status] = elementsCount > 0 ? Math.round((count / elementsCount) * 100) : 0;
   }
 
-  // Determinar estado general
+  // Determinar estado general según las reglas especificadas
   let overallStatus = 'No determinado';
+  let statusEmoji = '';
+  let statusDescription = '';
 
   // Si hay suficientes elementos con estado determinado
   const determinedCount = elementsCount - statusCounts['No determinado'];
 
   if (determinedCount > 0) {
-    // Calcular puntuación ponderada
-    const score = (
-      (statusCounts['Excelente'] * 4) +
-      (statusCounts['Bueno'] * 3) +
-      (statusCounts['Regular'] * 2) +
-      (statusCounts['Deficiente'] * 1)
-    ) / determinedCount;
+    // Calcular porcentajes para cada estado
+    const excellentGoodCount = statusCounts['Excelente'] + statusCounts['Bueno'];
+    const regularCount = statusCounts['Regular'];
+    const deficientCount = statusCounts['Deficiente'];
 
-    // Asignar estado general basado en la puntuación
-    if (score >= 3.5) {
-      overallStatus = 'Excelente';
-    } else if (score >= 2.5) {
-      overallStatus = 'Bueno';
-    } else if (score >= 1.5) {
-      overallStatus = 'Regular';
-    } else {
+    // Porcentaje de elementos en estado Regular
+    const regularPercentage = (regularCount / determinedCount) * 100;
+
+    // Aplicar las reglas especificadas:
+    // 1. Todo en Excelente/Bien: 🟢Excelente
+    // 2. Todo en Excelente/Bien pero con dos o más en regular: 🟢🔸Bien con Observaciones
+    // 3. Más del 25% en Regular: 🟡Regular
+    // 4. Más de 3 en Deficiente: 🔴Deficiente
+
+    if (deficientCount > 3) {
       overallStatus = 'Deficiente';
+      statusEmoji = '🔴';
+      statusDescription = 'Deficiente';
+    } else if (regularPercentage > 25) {
+      overallStatus = 'Regular';
+      statusEmoji = '🟡';
+      statusDescription = 'Regular';
+    } else if (regularCount >= 2) {
+      overallStatus = 'Bueno con Observaciones';
+      statusEmoji = '🟢🔸';
+      statusDescription = 'Bien con Observaciones';
+    } else if (excellentGoodCount === determinedCount) {
+      overallStatus = 'Excelente';
+      statusEmoji = '🟢';
+      statusDescription = 'Excelente';
+    } else {
+      // Caso por defecto si no cumple ninguna regla específica
+      overallStatus = 'Bueno';
+      statusEmoji = '🟢';
+      statusDescription = 'Bueno';
     }
   }
 
   return {
     overallStatus,
+    statusEmoji,
+    statusDescription,
     statusCounts,
     statusPercentages,
     elementsCount,
@@ -580,7 +604,7 @@ function generateGeminiAnalysisText(elements) {
   // Agregar resumen
   const summary = generateCleaningSummary(uniqueElements);
   analysisText += `\n\nResumen:\n`;
-  analysisText += `• Estado general: ${summary.overallStatus}\n`;
+  analysisText += `• Estado general: ${summary.statusEmoji} ${summary.statusDescription}\n`;
   analysisText += `• Elementos analizados: ${summary.elementsCount}\n`;
   analysisText += `• Excelente: ${summary.statusCounts.Excelente} (${summary.statusPercentages.Excelente}%)\n`;
   analysisText += `• Bueno: ${summary.statusCounts.Bueno} (${summary.statusPercentages.Bueno}%)\n`;
