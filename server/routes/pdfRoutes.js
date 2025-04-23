@@ -50,6 +50,8 @@ router.post('/upload', upload.single('file'), pdfController.uploadPDF);
 router.get('/documents', pdfController.getDocuments);
 router.get('/documents/:id', pdfController.getDocument);
 router.delete('/documents/:id', pdfController.deleteDocument);
+router.delete('/documents/all', pdfController.deleteAllDocuments); // Nueva ruta para eliminar todos los documentos
+router.get('/export/excel', pdfController.exportToExcel); // Nueva ruta para exportar a Excel
 router.post('/analyze/:id', pdfController.analyzePDF);
 router.get('/view/:id', pdfController.viewPDF); // Ruta para ver el PDF sin descargar
 router.get('/analysis/:id', pdfController.getDocumentAnalysis); // Ruta para obtener el análisis detallado

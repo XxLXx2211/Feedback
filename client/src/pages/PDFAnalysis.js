@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Form, Alert, Table, Spinner, Modal, Button } from 'react-bootstrap';
-import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaSearchPlus, FaPaperPlane, FaServer } from 'react-icons/fa';
-import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF } from '../services/pdfService';
+import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaSearchPlus, FaPaperPlane, FaServer, FaFileExcel, FaTrashAlt } from 'react-icons/fa';
+import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF, deleteAllDocuments, exportToExcel } from '../services/pdfService';
 import './PDFAnalysis.css';
 
 const PDFAnalysis = () => {
@@ -556,6 +556,45 @@ const PDFAnalysis = () => {
     }
   };
 
+  // Manejar eliminación de todos los documentos
+  const handleDeleteAllDocuments = async () => {
+    if (window.confirm('¿Estás seguro de eliminar TODOS los documentos? Esta acción no se puede deshacer.')) {
+      try {
+        setLoading(true);
+        await deleteAllDocuments();
+        setDocuments([]);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error al eliminar todos los documentos:', err);
+        setError('Error al eliminar todos los documentos.');
+        setLoading(false);
+      }
+    }
+  };
+
+  // Manejar exportación a Excel
+  const handleExportToExcel = async () => {
+    try {
+      setLoading(true);
+      const excelBlob = await exportToExcel();
+
+      // Crear un enlace temporal para descargar el archivo Excel
+      const url = window.URL.createObjectURL(excelBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'documentos_supervision.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setLoading(false);
+    } catch (err) {
+      console.error('Error al exportar a Excel:', err);
+      setError('Error al exportar a Excel.');
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="pdf-analysis-page">
       <div className="page-header">
@@ -644,13 +683,33 @@ const PDFAnalysis = () => {
                 <FaFilePdf className="me-2" />
                 Documentos Subidos
               </h5>
-              <button
-                type="button"
-                className="btn btn-outline-primary btn-sm"
-                onClick={loadDocuments}
-              >
-                Actualizar
-              </button>
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline-success btn-sm"
+                  onClick={handleExportToExcel}
+                  disabled={loading || !documents || documents.length === 0}
+                  title="Exportar a Excel"
+                >
+                  <FaFileExcel className="me-1" /> Excel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-danger btn-sm"
+                  onClick={handleDeleteAllDocuments}
+                  disabled={loading || !documents || documents.length === 0}
+                  title="Eliminar todos los documentos"
+                >
+                  <FaTrashAlt className="me-1" /> Eliminar Todo
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={loadDocuments}
+                >
+                  Actualizar
+                </button>
+              </div>
             </Card.Header>
             <Card.Body>
               {loading ? (

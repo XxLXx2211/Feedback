@@ -653,3 +653,136 @@ exports.getDocumentAnalysis = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener análisis del documento' });
   }
 };
+
+/**
+ * Eliminar todos los documentos
+ */
+exports.deleteAllDocuments = async (req, res) => {
+  try {
+    // Obtener el modelo PDFDocument
+    const PDFDocument = await getPDFDocumentModel();
+
+    // Obtener todos los documentos para eliminar archivos físicos
+    const documents = await PDFDocument.find({}, 'p');
+
+    // Eliminar archivos físicos
+    for (const doc of documents) {
+      if (doc.p && fs.existsSync(doc.p)) {
+        try {
+          fs.unlinkSync(doc.p);
+          console.log(`Archivo físico eliminado: ${doc.p}`);
+        } catch (fileError) {
+          console.error(`Error al eliminar archivo físico ${doc.p}:`, fileError);
+        }
+      }
+    }
+
+    // Eliminar todos los documentos de la base de datos
+    const result = await PDFDocument.deleteMany({});
+
+    res.status(200).json({
+      message: 'Todos los documentos han sido eliminados',
+      count: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error al eliminar todos los documentos:', error);
+    res.status(500).json({ error: 'Error al eliminar todos los documentos' });
+  }
+};
+
+/**
+ * Exportar documentos a Excel
+ */
+exports.exportToExcel = async (req, res) => {
+  try {
+    // Importar xlsx
+    const XLSX = require('xlsx');
+
+    // Obtener el modelo PDFDocument
+    const PDFDocument = await getPDFDocumentModel();
+
+    // Buscar documentos
+    const documents = await PDFDocument.find().sort({ creado: -1 });
+
+    // Transformar documentos para Excel
+    const excelData = documents.map(doc => ({
+      'Título': doc.t || 'Sin título',
+      'Estado De Limpieza': getCleaningStatus(doc),
+      'Fecha': new Date(doc.creado || new Date()).toLocaleDateString()
+    }));
+
+    // Crear libro de trabajo
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+    // Añadir hoja al libro
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Documentos');
+
+    // Generar archivo Excel
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // Configurar headers para descargar
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=documentos_supervision.xlsx');
+    res.setHeader('Content-Length', excelBuffer.length);
+
+    // Enviar archivo
+    res.send(excelBuffer);
+  } catch (error) {
+    console.error('Error al exportar a Excel:', error);
+    res.status(500).json({ error: 'Error al exportar a Excel' });
+  }
+};
+
+/**
+ * Obtener estado de limpieza formateado
+ */
+function getCleaningStatus(doc) {
+  // Si el documento no está procesado, devolver 'Pendiente'
+  if (doc.s !== 'c') {
+    return 'Pendiente';
+  }
+
+  try {
+    // Intentar parsear el análisis
+    let analysis = {};
+    if (doc.a && doc.a.length > 0) {
+      analysis = JSON.parse(doc.a);
+    }
+
+    // Si hay elementos identificados
+    if (analysis.elements && analysis.elements.length > 0) {
+      // Contar estados
+      const states = {
+        Excelente: 0,
+        Bueno: 0,
+        Regular: 0,
+        Deficiente: 0
+      };
+
+      // Contar cada estado
+      analysis.elements.forEach(el => {
+        if (states[el.state] !== undefined) {
+          states[el.state]++;
+        }
+      });
+
+      // Determinar estado general
+      if (states.Deficiente > 3) {
+        return '🔴 Deficiente';
+      } else if (states.Regular > analysis.elements.length * 0.25) {
+        return '🟡 Regular';
+      } else if (states.Regular >= 2) {
+        return '🟢🔸 Bien con Observaciones';
+      } else {
+        return '🟢 Excelente';
+      }
+    }
+
+    // Si no hay elementos o análisis, usar el estado del documento
+    return doc.g ? 'Procesado' : 'Sin análisis';
+  } catch (error) {
+    console.error('Error al obtener estado de limpieza:', error);
+    return 'Error';
+  }
+}

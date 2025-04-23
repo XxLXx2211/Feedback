@@ -211,3 +211,33 @@ export const chatWithPDF = async (id, message) => {
     throw error;
   }
 };
+
+/**
+ * Eliminar todos los documentos
+ * @returns {Promise<Object>} - Mensaje de confirmación
+ */
+export const deleteAllDocuments = async () => {
+  try {
+    const response = await API.delete('/pdf/documents/all');
+    return response.data;
+  } catch (error) {
+    console.error('Error al eliminar todos los documentos:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+/**
+ * Exportar documentos a Excel
+ * @returns {Promise<Blob>} - Archivo Excel como Blob
+ */
+export const exportToExcel = async () => {
+  try {
+    const response = await API.get('/pdf/export/excel', {
+      responseType: 'blob'
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error al exportar a Excel:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
