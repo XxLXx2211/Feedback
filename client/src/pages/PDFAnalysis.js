@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Form, Alert, Table, Spinner, Modal, Button } from 'react-bootstrap';
-import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaSearchPlus, FaPaperPlane, FaServer, FaFileExcel, FaTrashAlt } from 'react-icons/fa';
+import { FaUpload, FaFilePdf, FaTrash, FaComments, FaSearchPlus, FaPaperPlane, FaServer, FaFileExcel, FaTrashAlt } from 'react-icons/fa';
 import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF, deleteAllDocuments, exportToExcel } from '../services/pdfService';
 import './PDFAnalysis.css';
 
@@ -366,24 +366,7 @@ const PDFAnalysis = () => {
     window.open(`${API_URL}/pdf/view/${id}`, '_blank');
   };
 
-  // Manejar descarga de PDF
-  const handleDownloadPDF = async (id) => {
-    try {
-      // Obtener el documento
-      const document = await getDocument(id);
 
-      // Crear un enlace temporal para descargar el PDF
-      const link = document.createElement('a');
-      link.href = `data:application/pdf;base64,${document.pdfBase64}`;
-      link.download = document.filename || 'documento.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error('Error al descargar PDF:', err);
-      setError('Error al descargar el documento.');
-    }
-  };
 
   // Función para determinar el estado de limpieza basado en los resultados del análisis
   const getCleaningStatus = (doc) => {
@@ -770,15 +753,7 @@ const PDFAnalysis = () => {
                               >
                                 <FaFilePdf />
                               </Button>
-                              <Button
-                                variant="success"
-                                size="sm"
-                                className="action-btn"
-                                onClick={() => handleDownloadPDF(doc._id)}
-                                title="Descargar PDF"
-                              >
-                                <FaDownload />
-                              </Button>
+
                               <Button
                                 variant="danger"
                                 size="sm"
