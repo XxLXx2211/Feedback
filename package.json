@@ -20,7 +20,8 @@
     "concurrently": "^8.0.1",
     "dotenv": "^16.4.7",
     "mongodb": "^6.15.0",
-    "mongoose": "^8.13.2"
+    "mongoose": "^8.13.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
