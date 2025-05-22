@@ -1,27 +1,39 @@
 import axios from 'axios';
 
-// Obtener la URL base de la API
-// Usar la IP del host actual en lugar de localhost para evitar problemas de CORS
-const hostname = window.location.hostname;
-
-// Definir la URL de la API usando la variable de entorno
-// Usar la URL de producción para el despliegue
-// IMPORTANTE: Siempre usar la API de Render, nunca Railway
+// FORZAR EL USO DE RENDER EN LUGAR DE RAILWAY
+// Definir la URL de la API de Render de forma fija
 const RENDER_API_URL = 'https://sermalite-feedback-api.onrender.com/api';
-let apiUrl = process.env.REACT_APP_API_URL || RENDER_API_URL;
 
-// Verificar que no estamos usando Railway
-if (apiUrl.includes('railway')) {
-  console.error('ERROR: Detectada URL de Railway. Forzando cambio a Render.');
-  // Forzar el uso de Render en lugar de Railway
-  apiUrl = RENDER_API_URL;
-}
-
-// Definir la URL final
-const API_URL = apiUrl;
+// Ignorar completamente cualquier otra configuración
+// Usar siempre la URL de Render
+const API_URL = RENDER_API_URL;
 
 // Imprimir la URL para depuración
-console.log('Usando URL de API:', API_URL);
+console.log('Usando URL de API (forzada a Render):', API_URL);
+
+// Interceptor para axios para asegurarnos de que nunca se use Railway
+axios.interceptors.request.use(
+  config => {
+    // Verificar si la URL contiene 'railway'
+    if (config.url && config.url.includes('railway')) {
+      console.error('INTERCEPTOR: Detectada URL de Railway en solicitud axios:', config.url);
+
+      // Reemplazar la URL de Railway con la de Render
+      const newUrl = config.url.replace(
+        /https?:\/\/web-production-d1ba\.up\.railway\.app/g,
+        'https://sermalite-feedback-api.onrender.com'
+      );
+
+      console.log('INTERCEPTOR: Redirigiendo a:', newUrl);
+      config.url = newUrl;
+    }
+
+    return config;
+  },
+  error => {
+    return Promise.reject(error);
+  }
+);
 
 // Intentar hacer una solicitud de prueba para verificar la conexión
 // Construir la URL correctamente para la ruta de estado

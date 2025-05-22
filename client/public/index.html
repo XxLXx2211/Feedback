@@ -14,6 +14,21 @@
     <title>Sistema de Feedback</title>
     <!-- Script para interceptar solicitudes a Railway -->
     <script src="%PUBLIC_URL%/netlify.js"></script>
+    <!-- Registrar Service Worker -->
+    <script>
+      // Registrar el Service Worker para interceptar solicitudes a Railway
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('Service Worker registrado con éxito:', registration.scope);
+            })
+            .catch(error => {
+              console.error('Error al registrar el Service Worker:', error);
+            });
+        });
+      }
+    </script>
   </head>
   <body>
     <noscript>Necesitas habilitar JavaScript para ejecutar esta aplicación.</noscript>
