@@ -122,13 +122,11 @@ const FeedbackResponse = () => {
     let answeredCount = 0;
     let totalQuestions = 0;
     let answeredSiNoCount = 0;
-    let totalSiNoQuestions = 0;
 
     // Contar preguntas respondidas
     questions.forEach(question => {
       if (question.tipo_respuesta === 'si_no') {
         // Contar preguntas de tipo si_no por separado
-        totalSiNoQuestions++;
         const answer = answers[question._id];
         if (answer && answer.valor_si_no !== undefined) {
           answeredSiNoCount++;

@@ -98,7 +98,7 @@ const Employees = () => {
       };
 
       // Crear el empleado en la base de datos
-      const newEmployee = await createEmployee(employeeData);
+      await createEmployee(employeeData);
 
       // Recargar la lista de empleados
       await loadEmployees();

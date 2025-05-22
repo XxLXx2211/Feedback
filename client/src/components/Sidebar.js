@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { Nav } from 'react-bootstrap';
 import { Link, useLocation } from 'react-router-dom';
-import { FaHome, FaUsers, FaComments, FaFilePdf, FaSignOutAlt, FaQuestion, FaBuilding, FaLayerGroup, FaSearchPlus } from 'react-icons/fa';
+import { FaHome, FaUsers, FaComments, FaSignOutAlt, FaQuestion, FaBuilding, FaLayerGroup, FaSearchPlus } from 'react-icons/fa';
 import { AuthContext } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import './Sidebar.css';

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Button, Table, Badge, Spinner, Alert, Modal, Form, Row, Col } from 'react-bootstrap';
-import { FaPlus, FaEdit, FaTrash, FaQuestion, FaLayerGroup } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaTrash, FaQuestion } from 'react-icons/fa';
 import { getQuestions, createQuestion, updateQuestion, deleteQuestion } from '../services/questionService';
 import { getCategories } from '../services/categoryService';
 import './Questions.css';
@@ -25,7 +25,6 @@ const Questions = () => {
 
   // Estado para las categorías
   const [categories, setCategories] = useState([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
 
   // Cargar preguntas y categorías al montar el componente
   useEffect(() => {
@@ -51,13 +50,11 @@ const Questions = () => {
   // Función para cargar las categorías
   const loadCategories = async () => {
     try {
-      setLoadingCategories(true);
       const data = await getCategories();
       setCategories(data);
     } catch (err) {
       console.error('Error al cargar categorías:', err);
     } finally {
-      setLoadingCategories(false);
     }
   };
 

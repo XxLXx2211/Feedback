@@ -10,10 +10,12 @@ export const uploadPDF = async (formData) => {
     console.log('Subiendo PDF...');
 
     // Intentar con reintentos
-    let retries = 3;
+    let maxRetries = 3;
+    let currentAttempt = 0;
     let lastError = null;
 
-    while (retries > 0) {
+    while (currentAttempt < maxRetries) {
+      currentAttempt++;
       try {
         const response = await API.post('/pdf/upload', formData, {
           headers: {
@@ -33,12 +35,9 @@ export const uploadPDF = async (formData) => {
         return response.data;
       } catch (attemptError) {
         lastError = attemptError;
-        retries--;
-
-        if (retries > 0) {
-          console.log(`Error al subir PDF (intento ${3-retries}/3). Reintentando...`);
-          // Esperar antes de reintentar (1s, 2s, etc.)
-          await new Promise(resolve => setTimeout(resolve, (3-retries) * 1000));
+        if (currentAttempt < maxRetries) {
+          console.log(`Error al subir PDF (intento ${currentAttempt}/${maxRetries}). Reintentando en ${currentAttempt} segundo(s)...`);
+          await new Promise(resolve => setTimeout(resolve, currentAttempt * 1000));
         }
       }
     }
@@ -85,10 +84,12 @@ export const getDocuments = async (options = {}) => {
     const limit = options.limit || 20;
 
     // Intentar con reintentos
-    let retries = 3;
+    let maxRetries = 3;
+    let currentAttempt = 0;
     let lastError = null;
 
-    while (retries > 0) {
+    while (currentAttempt < maxRetries) {
+      currentAttempt++;
       try {
         console.log(`Obteniendo documentos PDF (página ${page}, límite ${limit})...`);
 
@@ -142,12 +143,9 @@ export const getDocuments = async (options = {}) => {
         }
       } catch (attemptError) {
         lastError = attemptError;
-        retries--;
-
-        if (retries > 0) {
-          console.log(`Error al obtener documentos (intento ${3-retries}/3). Reintentando...`);
-          // Esperar antes de reintentar (500ms, 1000ms, etc.)
-          await new Promise(resolve => setTimeout(resolve, (3-retries) * 500));
+        if (currentAttempt < maxRetries) {
+          console.log(`Error al obtener documentos (intento ${currentAttempt}/${maxRetries}). Reintentando en ${currentAttempt * 0.5} segundo(s)...`);
+          await new Promise(resolve => setTimeout(resolve, currentAttempt * 500));
         }
       }
     }

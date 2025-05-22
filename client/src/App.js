@@ -6,7 +6,6 @@ import './lightTheme.css'; // Importar estilos para el tema claro
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
-import PublicLayout from './layouts/PublicLayout';
 
 // Pages
 import Home from './pages/Home';
