@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Row, Col, Card, Form, Alert, Table, Spinner, Modal, Button } from 'react-bootstrap';
 import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaSearchPlus, FaPaperPlane, FaServer, FaSync } from 'react-icons/fa';
 import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF, fixDocumentAnalysis } from '../services/pdfService';
@@ -79,8 +79,8 @@ const PDFAnalysis = () => {
     totalDocuments: 0
   });
 
-  // Función para cargar documentos
-  const loadDocuments = async (showLoading = true, page = 1) => {
+  // Función para cargar documentos (envuelta en useCallback)
+  const loadDocuments = useCallback(async (showLoading = true, page = 1) => {
     try {
       if (showLoading) {
         setLoading(true);
@@ -157,7 +157,7 @@ const PDFAnalysis = () => {
         setLoading(false);
       }
     }
-  };
+  }, [documents, pagination.pageSize, pollingInterval, startPolling]); // Dependencias de useCallback
 
   // Manejar cambio de archivo
   const handleFileChange = (e) => {
