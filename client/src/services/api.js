@@ -12,12 +12,22 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 console.log('Usando URL de API hardcodeada:', API_URL);
 
 // Intentar hacer una solicitud de prueba para verificar la conexión
-// Construir la URL correctamente para evitar problemas con la ruta /api
+// Construir la URL correctamente para la ruta de estado
 let testUrl = API_URL;
-if (testUrl.endsWith('/api')) {
-  testUrl = testUrl.substring(0, testUrl.length - 4);
+if (!testUrl.endsWith('/status')) {
+  // Si la URL termina en /api, añadir /status
+  if (testUrl.endsWith('/api')) {
+    testUrl += '/status';
+  }
+  // Si no termina en /api, asegurarse de que tenga el formato correcto
+  else if (!testUrl.includes('/api/')) {
+    if (testUrl.endsWith('/')) {
+      testUrl += 'api/status';
+    } else {
+      testUrl += '/api/status';
+    }
+  }
 }
-testUrl += '/api/status';
 
 console.log('URL de prueba para verificar conexión:', testUrl);
 fetch(testUrl)
