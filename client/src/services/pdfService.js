@@ -15,7 +15,7 @@ export const uploadPDF = async (formData) => {
     let lastError = null;
 
     for (let i = 0; i < maxRetries; i++) {
-      currentAttempt = i + 1;
+      const attemptNum = i + 1; // Captura el valor de la iteración actual
       try {
         const response = await API.post('/pdf/upload', formData, {
           headers: {
@@ -35,9 +35,9 @@ export const uploadPDF = async (formData) => {
         return response.data;
       } catch (attemptError) {
         lastError = attemptError;
-        if (currentAttempt < maxRetries) {
-          console.log(`Error al subir PDF (intento ${currentAttempt}/${maxRetries}). Reintentando en ${currentAttempt} segundo(s)...`);
-          await new Promise(resolve => setTimeout(resolve, currentAttempt * 1000));
+        if (attemptNum < maxRetries) {
+          console.log(`Error al subir PDF (intento ${attemptNum}/${maxRetries}). Reintentando en ${attemptNum} segundo(s)...`);
+          await new Promise(resolve => setTimeout(resolve, attemptNum * 1000));
         }
       }
     }
@@ -89,7 +89,7 @@ export const getDocuments = async (options = {}) => {
     let lastError = null;
 
     for (let i = 0; i < maxRetries; i++) {
-      currentAttempt = i + 1;
+      const attemptNum = i + 1; // Captura el valor de la iteración actual
       try {
         console.log(`Obteniendo documentos PDF (página ${page}, límite ${limit})...`);
 
@@ -143,9 +143,9 @@ export const getDocuments = async (options = {}) => {
         }
       } catch (attemptError) {
         lastError = attemptError;
-        if (currentAttempt < maxRetries) {
-          console.log(`Error al obtener documentos (intento ${currentAttempt}/${maxRetries}). Reintentando en ${currentAttempt * 0.5} segundo(s)...`);
-          await new Promise(resolve => setTimeout(resolve, currentAttempt * 500));
+        if (attemptNum < maxRetries) {
+          console.log(`Error al obtener documentos (intento ${attemptNum}/${maxRetries}). Reintentando en ${attemptNum * 0.5} segundo(s)...`);
+          await new Promise(resolve => setTimeout(resolve, attemptNum * 500));
         }
       }
     }
