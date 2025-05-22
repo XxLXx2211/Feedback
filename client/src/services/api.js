@@ -6,10 +6,10 @@ const hostname = window.location.hostname;
 
 // Definir la URL de la API usando la variable de entorno
 // Usar la URL de producción para el despliegue
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'https://sermalite-feedback-api.onrender.com/api';
 
 // Imprimir la URL para depuración
-console.log('Usando URL de API hardcodeada:', API_URL);
+console.log('Usando URL de API:', API_URL);
 
 // Intentar hacer una solicitud de prueba para verificar la conexión
 // Construir la URL correctamente para la ruta de estado
