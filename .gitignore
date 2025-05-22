@@ -31,3 +31,4 @@ yarn-error.log*
 .vscode/
 *.sublime-project
 *.sublime-workspace
+server/firebase-credentials.json
