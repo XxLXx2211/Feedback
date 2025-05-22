@@ -6,7 +6,19 @@ const hostname = window.location.hostname;
 
 // Definir la URL de la API usando la variable de entorno
 // Usar la URL de producción para el despliegue
-const API_URL = process.env.REACT_APP_API_URL || 'https://sermalite-feedback-api.onrender.com/api';
+// IMPORTANTE: Siempre usar la API de Render, nunca Railway
+const RENDER_API_URL = 'https://sermalite-feedback-api.onrender.com/api';
+let apiUrl = process.env.REACT_APP_API_URL || RENDER_API_URL;
+
+// Verificar que no estamos usando Railway
+if (apiUrl.includes('railway')) {
+  console.error('ERROR: Detectada URL de Railway. Forzando cambio a Render.');
+  // Forzar el uso de Render en lugar de Railway
+  apiUrl = RENDER_API_URL;
+}
+
+// Definir la URL final
+const API_URL = apiUrl;
 
 // Imprimir la URL para depuración
 console.log('Usando URL de API:', API_URL);

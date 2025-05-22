@@ -1,2 +1,5 @@
+# Redirigir todas las solicitudes a Railway hacia Render
+https://web-production-d1ba.up.railway.app/* https://sermalite-feedback-api.onrender.com/:splat 301!
+http://web-production-d1ba.up.railway.app/* https://sermalite-feedback-api.onrender.com/:splat 301!
 /api/*  https://sermalite-feedback-api.onrender.com/api/:splat  200
 /*    /index.html   200
