@@ -179,7 +179,7 @@ const PDFAnalysis = () => {
       }
       return null;
     }
-  }, [documents, pollingInterval, analyzePDF]);
+  }, [documents]);
 
   // Función para iniciar el polling de documentos pendientes
   const startPolling = useCallback(() => {
@@ -207,7 +207,7 @@ const PDFAnalysis = () => {
 
     setPollingInterval(interval);
     console.log('Polling iniciado para documentos pendientes');
-  }, [documents, pollingInterval]); // Dependencias de useCallback
+  }, [documents, pollingInterval, loadDocuments]); // Dependencias de useCallback
 
   // Función para cargar documentos (envuelta en useCallback)
   const loadDocuments = useCallback(async (showLoading = true, page = 1) => {
