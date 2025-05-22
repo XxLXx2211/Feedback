@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Container, Row, Col, Card, Form, Alert, Table, Spinner, Modal, Button, Badge } from 'react-bootstrap';
+import { Container, Card, Form, Alert, Table, Spinner, Modal, Button, Badge } from 'react-bootstrap';
 import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaPaperPlane, FaServer, FaSync, FaEye } from 'react-icons/fa';
 import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF, fixDocumentAnalysis } from '../services/pdfService';
 import './PDFAnalysis.css';
@@ -28,9 +28,6 @@ const PDFAnalysis = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
 
   // Estados para análisis
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState('');
 
   // Estado para paginación
   const [pagination, setPagination] = useState({
@@ -362,10 +359,6 @@ const PDFAnalysis = () => {
 
 
   // Manejar cierre del modal de análisis
-  const handleCloseAnalysis = () => {
-    setShowAnalysis(false);
-    setAnalysisResult('');
-  };
 
   // Manejar apertura del chat
   const handleOpenChat = async (id) => {

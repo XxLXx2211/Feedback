@@ -14,8 +14,8 @@ export const uploadPDF = async (formData) => {
     let currentAttempt = 0;
     let lastError = null;
 
-    while (currentAttempt < maxRetries) {
-      currentAttempt++;
+    for (let i = 0; i < maxRetries; i++) {
+      currentAttempt = i + 1;
       try {
         const response = await API.post('/pdf/upload', formData, {
           headers: {
@@ -88,8 +88,8 @@ export const getDocuments = async (options = {}) => {
     let currentAttempt = 0;
     let lastError = null;
 
-    while (currentAttempt < maxRetries) {
-      currentAttempt++;
+    for (let i = 0; i < maxRetries; i++) {
+      currentAttempt = i + 1;
       try {
         console.log(`Obteniendo documentos PDF (página ${page}, límite ${limit})...`);
 
