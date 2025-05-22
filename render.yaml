@@ -53,11 +53,13 @@ services:
     staticPublishPath: ./client/build
     routes:
       - type: rewrite
+        source: /api/*
+        destination: https://sermalite-feedback-api.onrender.com/api/:splat
+      - type: rewrite
         source: /*
         destination: /index.html
     envVars:
       - key: REACT_APP_API_URL
-        fromService:
-          name: sermalite-feedback-api
-          type: web
-          property: url
+        value: https://sermalite-feedback-api.onrender.com/api
+      - key: CI
+        value: "false"
