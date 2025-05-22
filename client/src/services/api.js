@@ -43,7 +43,6 @@ fetch(testUrl)
 
 console.log('API URL configurada:', API_URL);
 console.log('REACT_APP_API_URL desde process.env:', process.env.REACT_APP_API_URL);
-console.log('Hostname detectado:', hostname);
 
 // Configurar tiempo de espera global para las solicitudes
 axios.defaults.timeout = 60000; // 60 segundos
