@@ -42,7 +42,7 @@ const PDFAnalysis = () => {
         clearInterval(pollingInterval);
       }
     };
-  }, []);
+  }, [loadDocuments, pollingInterval]);
 
   // Función para iniciar el polling de documentos pendientes
   const startPolling = () => {
@@ -108,81 +108,22 @@ const PDFAnalysis = () => {
         newDocuments = [];
       }
 
-      // Verificar si hay cambios en los documentos
-      const currentDocsJson = JSON.stringify(documents.map(d => ({ id: d._id, status: d.status })));
-      const newDocsJson = JSON.stringify(newDocuments.map(d => ({ id: d._id, status: d.status })));
-      const hasChanges = currentDocsJson !== newDocsJson;
-
-      if (hasChanges || showLoading) {
-        console.log('Actualizando lista de documentos');
-
-        // Verificar si algún documento cambió de estado a 'completed'
-        const newlyCompleted = newDocuments.filter(newDoc => {
-          const oldDoc = documents.find(doc => doc._id === newDoc._id);
-          return oldDoc && oldDoc.status !== 'completed' && newDoc.status === 'completed';
-        });
-
-        // Preparar los documentos para la actualización
-        const preparedDocuments = newDocuments.map(doc => {
-          // Buscar si el documento ya existe en la lista actual
-          const existingDoc = documents.find(d => d._id === doc._id);
-
-          // Si el documento ya existe y tiene análisis cargado, mantener esa información
-          if (existingDoc && existingDoc.geminiAnalysis) {
-            return {
-              ...doc,
-              analysisLoaded: true,
-              analysisLoading: false,
-              geminiAnalysis: existingDoc.geminiAnalysis
-            };
-          }
-
-          // Si el documento ya existe y está cargando análisis, mantener ese estado
-          if (existingDoc && existingDoc.analysisLoading) {
-            return {
-              ...doc,
-              analysisLoaded: false,
-              analysisLoading: true,
-              geminiAnalysis: null
-            };
-          }
-
-          // Para documentos nuevos o sin análisis, inicializar propiedades
-          return {
-            ...doc,
-            analysisLoaded: false,
-            analysisLoading: false,
-            geminiAnalysis: null
-          };
-        });
-
-        // Actualizar la lista de documentos
-        setDocuments(preparedDocuments);
-
-        // Cargar análisis para documentos completados que no tienen análisis cargado
-        preparedDocuments.forEach(doc => {
-          if (doc.status === 'completed' && !doc.analysisLoaded && !doc.analysisLoading) {
-            // Marcar como cargando para evitar múltiples solicitudes
-            doc.analysisLoading = true;
-
-            // Cargar el análisis en segundo plano con un pequeño retraso
-            setTimeout(() => {
-              loadDocumentAnalysis(doc._id);
-            }, 500);
-          }
-        });
-
-        // Si hay documentos recién completados, mostrar notificación
-        if (newlyCompleted.length > 0) {
-          console.log('Documentos recién procesados:', newlyCompleted.map(doc => doc.title));
-          // Mostrar notificación
-          setUploadSuccess('¡Documento(s) procesado(s) correctamente! Ya puedes usar el chat y otras funcionalidades.');
-          setTimeout(() => setUploadSuccess(''), 5000); // Ocultar después de 5 segundos
-        }
-      }
+      // Simplificar la lógica de actualización: siempre actualizar los documentos
+      console.log('Actualizando lista de documentos con nuevos datos.');
+      const preparedDocuments = newDocuments.map(doc => {
+        const existingDoc = documents.find(d => d._id === doc._id);
+        return {
+          ...doc,
+          analysisLoaded: existingDoc?.analysisLoaded || false,
+          analysisLoading: existingDoc?.analysisLoading || false,
+          geminiAnalysis: existingDoc?.geminiAnalysis || null
+        };
+      });
+      setDocuments(preparedDocuments);
+      console.log('Documentos cargados y actualizados:', preparedDocuments); // Nuevo log
 
       // Iniciar o detener polling según sea necesario
-      const hasPendingDocuments = newDocuments.some(doc => doc.status !== 'completed' && doc.status !== 'error');
+      const hasPendingDocuments = preparedDocuments.some(doc => doc.status !== 'completed' && doc.status !== 'error');
       if (hasPendingDocuments) {
         if (!pollingInterval) {
           startPolling();
@@ -192,6 +133,21 @@ const PDFAnalysis = () => {
         clearInterval(pollingInterval);
         setPollingInterval(null);
       }
+
+      // Cargar análisis para documentos completados que no tienen análisis cargado
+      preparedDocuments.forEach(doc => {
+        if (doc.status === 'completed' && !doc.analysisLoaded && !doc.analysisLoading) {
+          // Marcar como cargando para evitar múltiples solicitudes
+          doc.analysisLoading = true;
+
+          // Cargar el análisis en segundo plano con un pequeño retraso
+          setTimeout(() => {
+            loadDocumentAnalysis(doc._id);
+          }, 500);
+        }
+      });
+
+      // No hay necesidad de newlyCompleted aquí, ya que el polling se encarga de las notificaciones
     } catch (err) {
       console.error('Error al cargar documentos:', err);
       setError('Error al cargar los documentos. Por favor, intenta de nuevo.');
