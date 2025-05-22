@@ -40,10 +40,36 @@ const pdfDocumentSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // Contenido del PDF en base64 - Usar Buffer en lugar de String para mejor rendimiento
+  // Referencia al archivo PDF en el sistema de archivos
+  pdfPath: {
+    type: String,
+    required: false
+  },
+  // URL del PDF en Firebase Storage
+  pdfUrl: {
+    type: String,
+    required: false
+  },
+  // ID del PDF en Firebase Realtime Database
+  pdfId: {
+    type: String,
+    required: false
+  },
+  // Tamaño del archivo en bytes
+  fileSize: {
+    type: Number,
+    default: 0
+  },
+  // Indica el tipo de almacenamiento: 'firebase', 'firebase-db', 'filesystem' o 'mongodb'
+  storageType: {
+    type: String,
+    enum: ['firebase', 'firebase-db', 'filesystem', 'mongodb'],
+    default: 'firebase-db'
+  },
+  // Mantener compatibilidad con documentos antiguos (opcional, se eliminará en el futuro)
   pdf: {
-    type: Buffer, // Usar Buffer en lugar de String para mejor rendimiento y menor uso de memoria
-    required: [true, 'El contenido del PDF es obligatorio']
+    type: Buffer,
+    required: false
   },
   // Conversaciones optimizadas
   conv: [{

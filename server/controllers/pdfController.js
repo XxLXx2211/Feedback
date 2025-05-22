@@ -3,6 +3,8 @@ const path = require('path');
 const { analyzePDF } = require('../services/pdfService');
 const { analyzeWithGemini, generateChatResponse } = require('../services/aiService');
 const cleaningStatusService = require('../services/cleaningStatusService');
+const { uploadPDFToFirebase, deletePDFFromFirebase } = require('../config/firebase');
+const { uploadPDFToFirebaseDB, getPDFFromFirebaseDB, deletePDFFromFirebaseDB } = require('../config/firebaseDB');
 
 // Importar modelo para documentos PDF
 const { initModel } = require('../models/PDFDocument');
@@ -18,7 +20,7 @@ const getPDFDocumentModel = async () => {
 };
 
 /**
- * Subir un archivo PDF con procesamiento acelerado
+ * Subir un archivo PDF con procesamiento acelerado y almacenamiento en Firebase Realtime Database
  */
 exports.uploadPDF = async (req, res) => {
   try {
@@ -37,6 +39,14 @@ exports.uploadPDF = async (req, res) => {
     // Leer el archivo como buffer (más eficiente que base64)
     const pdfBuffer = fs.readFileSync(req.file.path);
 
+    // Obtener tamaño del archivo
+    const fileSize = fs.statSync(req.file.path).size;
+
+    // Subir el PDF a Firebase Realtime Database
+    console.log('Subiendo PDF a Firebase Realtime Database...');
+    const pdfId = await uploadPDFToFirebaseDB(pdfBuffer, req.file.filename);
+    console.log(`PDF subido a Firebase Realtime Database con ID: ${pdfId}`);
+
     // Obtener el modelo PDFDocument
     const PDFDocument = await getPDFDocumentModel();
 
@@ -45,11 +55,13 @@ exports.uploadPDF = async (req, res) => {
       t: title, // título abreviado
       d: description || '', // descripción abreviada
       f: req.file.filename, // nombre del archivo abreviado
-      p: req.file.path, // ruta del archivo abreviada
+      p: req.file.path, // ruta del archivo abreviada (mantener para compatibilidad)
       s: 'p', // estado abreviado (p=pendiente, c=completado, e=error)
       tx: '', // texto extraído abreviado
       a: '', // análisis abreviado
-      pdf: pdfBuffer, // contenido del PDF como buffer (más eficiente)
+      pdfId: pdfId, // ID del PDF en Firebase Realtime Database
+      fileSize: fileSize, // Tamaño del archivo
+      storageType: 'firebase-db', // Tipo de almacenamiento
       conv: [], // conversaciones vacías inicialmente
       // Nuevos campos para optimización
       processingStarted: new Date(), // Marca de tiempo para inicio de procesamiento
@@ -80,7 +92,9 @@ exports.uploadPDF = async (req, res) => {
     res.status(201).json({
       ...transformedDocument,
       message: 'Documento subido. El procesamiento comenzará inmediatamente.',
-      estimatedTime: '5-15 segundos' // Tiempo estimado optimista
+      estimatedTime: '5-15 segundos', // Tiempo estimado optimista
+      storageType: 'firebase-db', // Informar que se está usando Firebase Realtime Database
+      fileSize: fileSize // Informar el tamaño del archivo
     });
 
     console.log(`PDF ${newDocument._id} subido exitosamente, procesamiento iniciado`);
@@ -298,16 +312,31 @@ exports.deleteDocument = async (req, res) => {
       return res.status(404).json({ error: 'Documento no encontrado' });
     }
 
-    // Eliminar archivo físico si existe
-    const filePath = document.p;
-    if (filePath && fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Determinar el tipo de almacenamiento y eliminar el archivo
+    if (document.storageType === 'firebase-db' && document.pdfId) {
+      // Eliminar de Firebase Realtime Database
+      console.log(`Eliminando PDF de Firebase Realtime Database: ${document.pdfId}`);
+      await deletePDFFromFirebaseDB(document.pdfId);
+      console.log('PDF eliminado de Firebase Realtime Database');
+    } else if (document.storageType === 'firebase' && document.pdfUrl) {
+      // Eliminar de Firebase Storage
+      console.log(`Eliminando PDF de Firebase Storage: ${document.pdfUrl}`);
+      await deletePDFFromFirebase(document.pdfUrl);
+      console.log('PDF eliminado de Firebase Storage');
+    } else if (document.p && fs.existsSync(document.p)) {
+      // Eliminar archivo físico si existe
+      console.log(`Eliminando archivo físico: ${document.p}`);
+      fs.unlinkSync(document.p);
+      console.log('Archivo físico eliminado');
     }
 
     // Eliminar documento de la base de datos
     await PDFDocument.findByIdAndDelete(req.params.id);
 
-    res.status(200).json({ message: 'Documento eliminado correctamente' });
+    res.status(200).json({
+      message: 'Documento eliminado correctamente',
+      storageType: document.storageType || 'desconocido'
+    });
   } catch (error) {
     console.error('Error al eliminar documento:', error);
     res.status(500).json({ error: 'Error al eliminar documento' });
@@ -648,9 +677,12 @@ async function processDocumentFast(documentId) {
 
     // Buscar el documento con proyección mínima para mayor velocidad
     const document = await PDFDocument.findById(documentId, {
-      pdf: 1, // Solo necesitamos el PDF
-      p: 1,   // Y la ruta si existe
-      s: 1    // Y el estado
+      pdf: 1,        // PDF (para documentos antiguos)
+      p: 1,          // Ruta del archivo si existe
+      s: 1,          // Estado
+      pdfUrl: 1,     // URL de Firebase Storage
+      pdfId: 1,      // ID en Firebase Realtime Database
+      storageType: 1 // Tipo de almacenamiento
     });
 
     if (!document) {
@@ -671,17 +703,56 @@ async function processDocumentFast(documentId) {
     let filePath = null;
     let isTempFile = false;
 
+    // Determinar la fuente del PDF según el tipo de almacenamiento
+    if (document.storageType === 'firebase-db' && document.pdfId) {
+      // Obtener el PDF desde Firebase Realtime Database
+      console.log(`Obteniendo PDF desde Firebase Realtime Database: ${document.pdfId}`);
+
+      // Crear un archivo temporal para procesar el PDF
+      const tempFilePath = path.join(__dirname, '../uploads', `temp_firebase_db_${Date.now()}.pdf`);
+
+      // Obtener el buffer desde Firebase Realtime Database
+      const pdfBuffer = await getPDFFromFirebaseDB(document.pdfId);
+
+      // Guardar el buffer en un archivo temporal
+      fs.writeFileSync(tempFilePath, pdfBuffer);
+      filePath = tempFilePath;
+      isTempFile = true;
+      console.log(`PDF obtenido de Firebase Realtime Database y guardado en: ${filePath}`);
+    }
+    else if (document.storageType === 'firebase' && document.pdfUrl) {
+      // Descargar el PDF desde Firebase Storage
+      console.log(`Descargando PDF desde Firebase Storage: ${document.pdfUrl}`);
+
+      // Crear un archivo temporal para procesar el PDF
+      const tempFilePath = path.join(__dirname, '../uploads', `temp_firebase_${Date.now()}.pdf`);
+
+      // Descargar el archivo usando fetch
+      const fetch = require('node-fetch');
+      const response = await fetch(document.pdfUrl);
+      const buffer = await response.buffer();
+
+      // Guardar el buffer en un archivo temporal
+      fs.writeFileSync(tempFilePath, buffer);
+      filePath = tempFilePath;
+      isTempFile = true;
+      console.log(`PDF descargado de Firebase Storage y guardado en: ${filePath}`);
+    }
     // Intentar usar el archivo físico si existe
-    if (document.p && fs.existsSync(document.p)) {
+    else if (document.p && fs.existsSync(document.p)) {
       filePath = document.p;
       console.log(`Usando archivo físico existente: ${filePath}`);
-    } else {
-      // Si no existe el archivo físico, usar el PDF almacenado
+    }
+    // Si no hay Firebase ni archivo físico, usar el PDF almacenado en MongoDB
+    else if (document.pdf && Buffer.isBuffer(document.pdf)) {
       const tempFilePath = path.join(__dirname, '../uploads', `temp_fast_${Date.now()}.pdf`);
       fs.writeFileSync(tempFilePath, document.pdf);
       filePath = tempFilePath;
       isTempFile = true;
-      console.log(`Creado archivo temporal para procesamiento rápido: ${filePath}`);
+      console.log(`Creado archivo temporal desde MongoDB para procesamiento rápido: ${filePath}`);
+    }
+    else {
+      throw new Error('No se pudo acceder al PDF desde ninguna fuente de almacenamiento');
     }
 
     // Extraer texto del PDF directamente (sin análisis completo para mayor velocidad)
@@ -794,20 +865,50 @@ exports.viewPDF = async (req, res) => {
       return res.status(404).json({ error: 'Documento no encontrado' });
     }
 
-    // Verificar si tenemos el PDF
-    if (!document.pdf || !Buffer.isBuffer(document.pdf)) {
-      return res.status(404).json({ error: 'Contenido del PDF no disponible' });
+    // Verificar el tipo de almacenamiento
+    if (document.storageType === 'firebase-db' && document.pdfId) {
+      // Obtener el PDF desde Firebase Realtime Database
+      console.log(`Obteniendo PDF desde Firebase Realtime Database: ${document.pdfId}`);
+      try {
+        const pdfBuffer = await getPDFFromFirebaseDB(document.pdfId);
+
+        // Configurar headers para mostrar el PDF en el navegador
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${document.f || 'document.pdf'}"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        // Enviar el PDF
+        return res.send(pdfBuffer);
+      } catch (dbError) {
+        console.error('Error al obtener PDF de Firebase Realtime Database:', dbError);
+        // Si falla, intentar con otros métodos
+      }
+    } else if (document.storageType === 'firebase' && document.pdfUrl) {
+      // Redirigir al URL de Firebase Storage
+      console.log(`Redirigiendo a Firebase Storage: ${document.pdfUrl}`);
+      return res.redirect(document.pdfUrl);
+    } else if (document.pdf && Buffer.isBuffer(document.pdf)) {
+      // Usar el PDF almacenado en MongoDB (compatibilidad con documentos antiguos)
+      console.log('Sirviendo PDF desde MongoDB');
+
+      // Configurar headers para mostrar el PDF en el navegador
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${document.f || 'document.pdf'}"`);
+      res.setHeader('Content-Length', document.pdf.length);
+
+      // Enviar el PDF
+      return res.send(document.pdf);
+    } else if (document.p && fs.existsSync(document.p)) {
+      // Usar el archivo físico si existe
+      console.log(`Sirviendo PDF desde archivo físico: ${document.p}`);
+      return res.sendFile(document.p);
     }
 
-    // Enviar el PDF como respuesta (ya está como buffer)
-
-    // Configurar headers para mostrar el PDF en el navegador
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${document.f || 'document.pdf'}"`);
-    res.setHeader('Content-Length', document.pdf.length);
-
-    // Enviar el PDF
-    res.send(document.pdf);
+    // Si no hay ninguna forma de acceder al PDF
+    return res.status(404).json({
+      error: 'Contenido del PDF no disponible',
+      storageType: document.storageType || 'desconocido'
+    });
   } catch (error) {
     console.error('Error al ver PDF:', error);
     res.status(500).json({ error: 'Error al mostrar el documento' });

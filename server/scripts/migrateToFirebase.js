@@ -1,0 +1,119 @@
+/**
+ * Script para migrar PDFs de MongoDB a Firebase Storage
+ * 
+ * Este script:
+ * 1. Busca todos los documentos en MongoDB que tienen el PDF almacenado
+ * 2. Sube cada PDF a Firebase Storage
+ * 3. Actualiza el documento en MongoDB con la URL de Firebase Storage
+ * 4. Opcionalmente, elimina el PDF de MongoDB para ahorrar espacio
+ * 
+ * Uso:
+ * node migrateToFirebase.js [--delete-after-migration]
+ * 
+ * Opciones:
+ * --delete-after-migration: Elimina el PDF de MongoDB después de migrarlo a Firebase Storage
+ */
+
+require('dotenv').config({ path: '../.env' });
+const mongoose = require('mongoose');
+const { connectPDFDatabase } = require('../config/pdfDatabase');
+const { uploadPDFToFirebase } = require('../config/firebase');
+
+// Argumentos de línea de comandos
+const deleteAfterMigration = process.argv.includes('--delete-after-migration');
+
+// Función principal
+async function migrateToFirebase() {
+  try {
+    console.log('Iniciando migración de PDFs a Firebase Storage...');
+    
+    // Conectar a MongoDB
+    const pdfConnection = await connectPDFDatabase();
+    
+    // Obtener el modelo PDFDocument
+    const PDFDocument = pdfConnection.model('PDFDocument');
+    
+    // Buscar documentos que tienen PDF almacenado en MongoDB
+    // y que no tienen URL de Firebase Storage
+    const documents = await PDFDocument.find({
+      pdf: { $exists: true, $ne: null },
+      $or: [
+        { pdfUrl: { $exists: false } },
+        { pdfUrl: null },
+        { pdfUrl: '' }
+      ]
+    });
+    
+    console.log(`Se encontraron ${documents.length} documentos para migrar.`);
+    
+    // Contador de documentos migrados
+    let migratedCount = 0;
+    let errorCount = 0;
+    
+    // Migrar cada documento
+    for (const document of documents) {
+      try {
+        console.log(`Migrando documento ${document._id} (${migratedCount + 1}/${documents.length})...`);
+        
+        // Verificar si el documento tiene PDF
+        if (!document.pdf || !Buffer.isBuffer(document.pdf)) {
+          console.log(`El documento ${document._id} no tiene PDF válido, omitiendo...`);
+          continue;
+        }
+        
+        // Subir PDF a Firebase Storage
+        const pdfUrl = await uploadPDFToFirebase(
+          document.pdf,
+          document.f || `document_${document._id}.pdf`
+        );
+        
+        // Actualizar documento en MongoDB
+        const updateData = {
+          pdfUrl: pdfUrl,
+          storageType: 'firebase',
+          fileSize: document.pdf.length
+        };
+        
+        // Si se especificó la opción de eliminar después de migrar
+        if (deleteAfterMigration) {
+          updateData.pdf = null; // Eliminar PDF de MongoDB
+        }
+        
+        await PDFDocument.findByIdAndUpdate(document._id, updateData);
+        
+        console.log(`Documento ${document._id} migrado exitosamente a Firebase Storage.`);
+        console.log(`URL: ${pdfUrl}`);
+        
+        migratedCount++;
+      } catch (error) {
+        console.error(`Error al migrar documento ${document._id}:`, error);
+        errorCount++;
+      }
+    }
+    
+    console.log('\n===== RESUMEN DE MIGRACIÓN =====');
+    console.log(`Total de documentos encontrados: ${documents.length}`);
+    console.log(`Documentos migrados exitosamente: ${migratedCount}`);
+    console.log(`Documentos con errores: ${errorCount}`);
+    console.log(`PDFs eliminados de MongoDB: ${deleteAfterMigration ? migratedCount : 0}`);
+    
+    // Cerrar conexión a MongoDB
+    await mongoose.connection.close();
+    console.log('Conexión a MongoDB cerrada.');
+    
+    console.log('\nMigración completada.');
+    
+  } catch (error) {
+    console.error('Error en la migración:', error);
+    process.exit(1);
+  }
+}
+
+// Ejecutar la función principal
+migrateToFirebase().then(() => {
+  console.log('Script finalizado.');
+  process.exit(0);
+}).catch(error => {
+  console.error('Error fatal:', error);
+  process.exit(1);
+});
