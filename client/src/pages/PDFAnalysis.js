@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Row, Col, Card, Form, Alert, Table, Spinner, Modal, Button } from 'react-bootstrap';
-import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaPaperPlane, FaServer, FaSync } from 'react-icons/fa';
+import { Container, Row, Col, Card, Form, Alert, Table, Spinner, Modal, Button, Badge } from 'react-bootstrap';
+import { FaUpload, FaFilePdf, FaTrash, FaComments, FaDownload, FaPaperPlane, FaServer, FaSync, FaEye } from 'react-icons/fa';
 import { uploadPDF, getDocuments, getDocument, deleteDocument, analyzePDF, chatWithPDF, fixDocumentAnalysis } from '../services/pdfService';
 import './PDFAnalysis.css';
 
